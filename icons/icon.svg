@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Minimal input icon with cursor">
+  <title>Short it smart — icon (minimal input field with cursor)</title>
+
+  <!-- Background rounded square -->
+  <rect x="48" y="48" width="928" height="928" rx="160" ry="160" fill="#F5F6F7"/>
+
+  <!-- Input field outer rounded rectangle -->
+  <rect x="92" y="412" width="840" height="200" rx="48" ry="48" fill="none" stroke="#172022" stroke-width="36" stroke-linejoin="round"/>
+
+  <!-- Inner short horizontal line (simulates typed text / placeholder) -->
+  <line x1="220" y1="512" x2="700" y2="512" stroke="#172022" stroke-width="36" stroke-linecap="round"/>
+
+  <!-- Cursor (vertical bar) -->
+  <line x1="760" y1="478" x2="760" y2="546" stroke="#172022" stroke-width="36" stroke-linecap="round"/>
+
+  <!-- Optional subtle shadow under input -->
+  <ellipse cx="512" cy="642" rx="220" ry="12" fill="#000000" opacity="0.02"/>
+</svg>
