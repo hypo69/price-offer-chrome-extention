@@ -1,0 +1,52 @@
+{
+  "extensionName": {
+    "message": "הצעת מחיר קזרינוב",
+    "description": "שם התוסף"
+  },
+  "extensionDescription": {
+    "message": "יוצר תיאורים ברורים ומסודרים של רכיבי מחשב",
+    "description": "תיאור התוסף"
+  },
+  "contextMenuTitle": {
+    "message": "צור הצעת מחיר",
+    "description": "כותרת פריט בתפריט ההקשרי"
+  },
+  "apiKeyLabel": {
+    "message": "מפתח API של Google Gemini",
+    "description": "תווית שדה למפתח ה-API"
+  },
+  "modelLabel": {
+    "message": "דגם",
+    "description": "תווית לבחירת הדגם"
+  },
+  "saveButton": {
+    "message": "שמור",
+    "description": "טקסט כפתור השמירה"
+  },
+  "statusNoApiKey": {
+    "message": "אנא הזן את מפתח ה-API שלך",
+    "description": "הודעת מצב כאשר אין מפתח API"
+  },
+  "indicatorAnalyzing": {
+    "message": "מייצר את הצעת המחיר שלך…",
+    "description": "הודעת מצב במהלך ניתוח התוכן"
+  },
+  "errorFetchContent": {
+    "message": "לא ניתן לטעון את תוכן הדף",
+    "description": "שגיאה בעת ניסיון לשלוף את תוכן הדף"
+  },
+  "errorPageTooShort": {
+    "message": "תוכן הדף קצר מדי",
+    "description": "שגיאה כאשר תוכן הדף אינו מספיק"
+  },
+  "errorApi": {
+    "message": "שגיאת API: $error$",
+    "description": "שגיאה כללית של ה-API",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "מפתח API לא חוקי"
+      }
+    }
+  }
+}

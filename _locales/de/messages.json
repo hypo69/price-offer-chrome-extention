@@ -1,0 +1,52 @@
+{
+  "extensionName": {
+    "message": "Kazarinov Preisangebot",
+    "description": "Name der Erweiterung"
+  },
+  "extensionDescription": {
+    "message": "Erstellt übersichtliche und detaillierte Beschreibungen von Computerkomponenten",
+    "description": "Beschreibung der Erweiterung"
+  },
+  "contextMenuTitle": {
+    "message": "Preisangebot erstellen",
+    "description": "Titel des Kontextmenüeintrags"
+  },
+  "apiKeyLabel": {
+    "message": "Google Gemini API-Schlüssel",
+    "description": "Beschriftung für das Eingabefeld des API-Schlüssels"
+  },
+  "modelLabel": {
+    "message": "Modell",
+    "description": "Beschriftung für die Modellauswahl"
+  },
+  "saveButton": {
+    "message": "Speichern",
+    "description": "Text der Speichern-Schaltfläche"
+  },
+  "statusNoApiKey": {
+    "message": "Bitte geben Sie Ihren API-Schlüssel ein",
+    "description": "Statusmeldung, wenn kein API-Schlüssel vorhanden ist"
+  },
+  "indicatorAnalyzing": {
+    "message": "Das Preisangebot wird erstellt...",
+    "description": "Anzeige während der Analyse"
+  },
+  "errorFetchContent": {
+    "message": "Inhalt der Seite konnte nicht geladen werden",
+    "description": "Fehler beim Abrufen des Seiteninhalts"
+  },
+  "errorPageTooShort": {
+    "message": "Die Seite enthält zu wenig Inhalt",
+    "description": "Fehler, wenn die Seite zu kurz ist"
+  },
+  "errorApi": {
+    "message": "API-Fehler: $error$",
+    "description": "Allgemeiner API-Fehler",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "Ungültiger API-Schlüssel"
+      }
+    }
+  }
+}

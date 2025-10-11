@@ -1,0 +1,52 @@
+{
+  "extensionName": {
+    "message": "Предложение цены Казаринов",
+    "description": "Название расширения"
+  },
+  "extensionDescription": {
+    "message": "Создаёт чёткие и структурированные описания компонентов компьютера",
+    "description": "Описание расширения"
+  },
+  "contextMenuTitle": {
+    "message": "Сформировать предложение цены",
+    "description": "Название пункта контекстного меню"
+  },
+  "apiKeyLabel": {
+    "message": "API-ключ Google Gemini",
+    "description": "Подпись для поля ввода API-ключа"
+  },
+  "modelLabel": {
+    "message": "Модель",
+    "description": "Подпись для выбора модели"
+  },
+  "saveButton": {
+    "message": "Сохранить",
+    "description": "Текст кнопки сохранения"
+  },
+  "statusNoApiKey": {
+    "message": "Пожалуйста, введите ваш API-ключ",
+    "description": "Сообщение, когда API-ключ не введён"
+  },
+  "indicatorAnalyzing": {
+    "message": "Формируется ваше предложение цены…",
+    "description": "Сообщение во время анализа"
+  },
+  "errorFetchContent": {
+    "message": "Не удалось получить содержимое страницы",
+    "description": "Ошибка при получении содержимого страницы"
+  },
+  "errorPageTooShort": {
+    "message": "Страница содержит слишком мало контента",
+    "description": "Ошибка, когда страница слишком короткая"
+  },
+  "errorApi": {
+    "message": "Ошибка API: $error$",
+    "description": "Общее сообщение об ошибке API",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "Неверный API-ключ"
+      }
+    }
+  }
+}

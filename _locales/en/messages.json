@@ -1,0 +1,52 @@
+{
+  "extensionName": {
+    "message": "Kazarinov Price Offer",
+    "description": "Name of the extension"
+  },
+  "extensionDescription": {
+    "message": "Creates clear and structured descriptions of computer components",
+    "description": "Description of the extension"
+  },
+  "contextMenuTitle": {
+    "message": "Generate Price Offer",
+    "description": "Context menu item title"
+  },
+  "apiKeyLabel": {
+    "message": "Google Gemini API Key",
+    "description": "Label for the API key input field"
+  },
+  "modelLabel": {
+    "message": "Model",
+    "description": "Label for selecting the model"
+  },
+  "saveButton": {
+    "message": "Save",
+    "description": "Text on the save button"
+  },
+  "statusNoApiKey": {
+    "message": "Please enter your API key",
+    "description": "Status message shown when no API key is entered"
+  },
+  "indicatorAnalyzing": {
+    "message": "Generating your price offer...",
+    "description": "Indicator message shown during analysis"
+  },
+  "errorFetchContent": {
+    "message": "Unable to fetch page content",
+    "description": "Error shown when the page content cannot be retrieved"
+  },
+  "errorPageTooShort": {
+    "message": "The page contains too little content",
+    "description": "Error shown when the page is too short"
+  },
+  "errorApi": {
+    "message": "API Error: $error$",
+    "description": "Generic API error message",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "Invalid API key"
+      }
+    }
+  }
+}

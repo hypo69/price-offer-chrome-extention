@@ -165,7 +165,6 @@ log/
 tmp/
 bin/
 export/
-data/
 statistic/
 storage/
 materials/
