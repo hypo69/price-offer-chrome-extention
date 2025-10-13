@@ -1,6 +1,6 @@
 // background.js
 
-// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
+// --- КОПИЯ ЛОГИКИ ИЗ "КОРОЧЕ!" ---
 
 function showIndicatorOnPage(tabId, message) {
     chrome.scripting.executeScript({
@@ -95,7 +95,7 @@ function showSummaryDirectly(tabId, summary) {
     });
 }
 
-// --- ЗАГРУЗКА ПРОМПТА ПО ЛОКАЛИ ---
+// --- ЗАГРУЗКА ПРОМПТА ---
 async function loadPriceOfferPrompt() {
     let locale = 'en';
     try {
@@ -106,108 +106,132 @@ async function loadPriceOfferPrompt() {
         console.warn("Не удалось определить локаль, используем en");
     }
 
-    const tryLoad = async (path) => {
-        try {
-            const url = chrome.runtime.getURL(path);
-            const res = await fetch(url);
-            if (res.ok) return await res.text();
-        } catch (e) {
-            console.warn(`Не удалось загрузить ${path}`);
-        }
-        return null;
-    };
-
-    let promptText = await tryLoad(`instructions/${locale}/price_offer_prompt.txt`);
-    if (!promptText) {
-        promptText = await tryLoad(`instructions/en/price_offer_prompt.txt`);
+    const url = chrome.runtime.getURL(`instructions/${locale}/price_offer_prompt.txt`);
+    try {
+        const res = await fetch(url);
+        if (res.ok) return await res.text();
+    } catch (e) {
+        console.warn(`Файл ${url} не найден`);
     }
-    return promptText || "Анализируйте компоненты компьютера и верните структурированный JSON.";
+
+    // Fallback на английский
+    const fallbackUrl = chrome.runtime.getURL(`instructions/en/price_offer_prompt.txt`);
+    try {
+        const res = await fetch(fallbackUrl);
+        if (res.ok) return await res.text();
+    } catch (e) {
+        console.warn("Английский промпт тоже не найден");
+    }
+
+    return "Анализируйте компоненты компьютера и верните структурированный JSON.";
 }
 
-// --- ВЫЗОВ GEMINI API ---
-async function callGeminiAPI(pageText, apiKey, model) {
+// --- ВЫЗОВ GEMINI ---
+async function summarizeWithGemini(text, tabId, productId = null) {
+    const { geminiApiKey, geminiModel } = await chrome.storage.sync.get(['geminiApiKey', 'geminiModel']);
+    const model = geminiModel || 'gemini-2.5-flash';
+
+    if (!geminiApiKey) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+        return;
+    }
+
     const instructions = await loadPriceOfferPrompt();
-    const prompt = `Анализируйте компоненты компьютера из следующего текста:\n\n${pageText.substring(0, 10000)}\n\n${instructions}`;
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-    const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-        })
-    });
-
-    const data = await response.json();
-    if (data.error) {
-        throw new Error(data.error.message || "Ошибка Gemini API");
-    }
-
-    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!resultText) {
-        throw new Error("Пустой ответ от модели");
-    }
-
-    return resultText;
-}
-
-// --- СОХРАНЕНИЕ В ASSEMBLY ---
-async function addToAssembly(productId) {
-    if (!productId) return;
-
-    const stored = await chrome.storage.local.get("assembly");
-    let assembly = stored.assembly || { products: [] };
+    const prompt = `Анализируйте компоненты компьютера из следующего текста:\n\n${text.substring(0, 10000)}\n\n${instructions}`;
 
     try {
-        const resp = await fetch(chrome.runtime.getURL('data/products.json'));
-        const productsData = await resp.json();
-        const product = productsData.ru?.products.find(p => p.product_id === productId);
-        if (product && !assembly.products.some(p => p.product_id === productId)) {
-            assembly.products.push(product);
-            await chrome.storage.local.set({ assembly });
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (data.error) {
+            throw new Error(data.error.message || "Ошибка Gemini API");
         }
-    } catch (e) {
-        console.warn("Не удалось обновить assembly", e);
+
+        const summary = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!summary) {
+            throw new Error("Пустой ответ от модели");
+        }
+
+        // Сохраняем в assembly
+        if (productId) {
+            const stored = await chrome.storage.local.get("assembly");
+            let assembly = stored.assembly || { products: [] };
+            try {
+                const resp = await fetch(chrome.runtime.getURL('data/products.json'));
+                const productsData = await resp.json();
+                const product = productsData.ru?.products.find(p => p.product_id === productId);
+                if (product && !assembly.products.some(p => p.product_id === productId)) {
+                    assembly.products.push(product);
+                    await chrome.storage.local.set({ assembly });
+                }
+            } catch (e) {
+                console.warn("Не удалось обновить assembly", e);
+            }
+        }
+
+        // Сохраняем результат
+        await chrome.storage.local.set({ lastOffer: summary });
+
+        // Показываем результат
+        chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            func: () => !!window.__gemini_content_script_loaded
+        }, (results) => {
+            if (results?.[0]?.result) {
+                chrome.tabs.sendMessage(tabId, { action: "showSummary", summary });
+            } else {
+                showSummaryDirectly(tabId, summary);
+            }
+        });
+
+    } catch (error) {
+        console.error("Ошибка Gemini:", error);
+        let msg = error.message || "Неизвестная ошибка";
+        showErrorOnPage(tabId, `Gemini: ${msg.substring(0, 50)}`);
     }
 }
 
 // --- СОЗДАНИЕ МЕНЮ ---
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.removeAll();
-
-    const title = chrome.i18n.getMessage('contextMenuTitle') || 'Сформировать предложение цены';
 
     chrome.contextMenus.create({
         id: "generate-offer",
-        title,
+        title: chrome.i18n.getMessage('contextMenuTitle') || 'Сформировать предложение цены',
         contexts: ["page"]
     });
 
-    let products = [];
-    try {
-        const resp = await fetch(chrome.runtime.getURL('data/products.json'));
-        const data = await resp.json();
-        products = data.ru?.products || [];
-    } catch (e) {
-        console.warn('products.json is missing or invalid', e);
-    }
-
-    for (const product of products) {
-        chrome.contextMenus.create({
-            id: `product-${product.product_id}`,
-            parentId: "generate-offer",
-            title: product.product_name,
-            contexts: ["page"]
-        });
-
-        chrome.contextMenus.create({
-            id: `delete-${product.product_id}`,
-            parentId: `product-${product.product_id}`,
-            title: '❌ Удалить',
-            contexts: ["page"]
-        });
-    }
+    // Загрузка продуктов
+    fetch(chrome.runtime.getURL('data/products.json'))
+        .then(r => r.json())
+        .then(data => {
+            const products = data.ru?.products || [];
+            products.forEach(product => {
+                chrome.contextMenus.create({
+                    id: `product-${product.product_id}`,
+                    parentId: "generate-offer",
+                    title: product.product_name,
+                    contexts: ["page"]
+                });
+                chrome.contextMenus.create({
+                    id: `delete-${product.product_id}`,
+                    parentId: `product-${product.product_id}`,
+                    title: '❌ Удалить',
+                    contexts: ["page"]
+                });
+            });
+        })
+        .catch(e => console.warn('products.json не загружен', e));
 });
 
 // --- ОБРАБОТКА КЛИКОВ ---
@@ -240,14 +264,13 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         return;
     }
 
-    // Показываем индикатор
+    // Для всех остальных — запускаем обработку
     showIndicatorOnPage(tab.id, "Формируется предложение...");
 
-    // Получаем текст страницы
     chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => document.body.innerText || document.documentElement.innerText
-    }, async (results) => {
+    }, (results) => {
         hideIndicatorOnPage(tab.id);
 
         if (chrome.runtime.lastError) {
@@ -261,58 +284,18 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
             return;
         }
 
-        // Получаем настройки
-        const { geminiApiKey, geminiModel } = await chrome.storage.sync.get(['geminiApiKey', 'geminiModel']);
-        const model = geminiModel || 'gemini-2.5-flash';
-
-        if (!geminiApiKey) {
-            chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
-            return;
-        }
-
         let productId = null;
         if (id.startsWith('product-')) {
             productId = id.replace('product-', '');
         }
 
-        try {
-            const resultText = await callGeminiAPI(text, geminiApiKey, model);
-
-            // Сохраняем в assembly
-            await addToAssembly(productId);
-
-            // Сохраняем результат
-            await chrome.storage.local.set({ lastOffer: resultText });
-
-            // Показываем результат
-            chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: () => !!window.__gemini_content_script_loaded
-            }, (results) => {
-                if (results?.[0]?.result) {
-                    chrome.tabs.sendMessage(tab.id, { action: "showSummary", summary: resultText });
-                } else {
-                    showSummaryDirectly(tab.id, resultText);
-                }
-            });
-
-        } catch (error) {
-            console.error("Ошибка Gemini:", error);
-            showErrorOnPage(tab.id, `Gemini: ${error.message.substring(0, 50)}`);
-        }
+        summarizeWithGemini(text, tab.id, productId);
     });
 });
 
-// --- ОБРАБОТЧИКИ СООБЩЕНИЙ ---
+// --- ОБРАБОТЧИКИ ---
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "openChat") {
         chrome.tabs.create({ url: chrome.runtime.getURL("chat.html") });
-    } else if (request.action === "openResult") {
-        chrome.tabs.create({ url: chrome.runtime.getURL("result.html") });
     }
-});
-
-// Открытие popup по клику на иконку
-chrome.action.onClicked.addListener((tab) => {
-    chrome.tabs.create({ url: chrome.runtime.getURL("popup.html") });
 });

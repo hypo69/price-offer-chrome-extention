@@ -1,0 +1,21 @@
+
+En esta página se encuentra información sobre un componente para ensamblar una computadora.
+Tu tarea es identificar en la página los siguientes bloques:
+
+1. Nombre del componente
+2. Descripción del componente
+3. Especificaciones del componente
+4. Imagen del componente (si existe)
+
+Debes devolver un objeto JSON con los siguientes campos:
+
+```json
+{
+  "title": "nombre del componente",
+  "description": "descripción del componente",
+  "specification": "especificaciones del componente",
+  "image_local_saved_path": "ruta local de la imagen del componente, si existe, de lo contrario una cadena vacía"
+}
+```
+
+---

@@ -1,3 +1,5 @@
+// popup.js
+
 document.addEventListener("DOMContentLoaded", async () => {
     const { geminiModel } = await chrome.storage.sync.get(['geminiModel']);
     if (geminiModel) {
@@ -6,7 +8,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 document.getElementById('save').addEventListener('click', async () => {
-    const apiKey = document.getElementById('api-key').value.trim();
+    const apiKey = document.getElementById('apiKey').value.trim();
     const model = document.getElementById('model').value;
     if (!apiKey) {
         alert("Пожалуйста, введите API ключ");

@@ -30,7 +30,7 @@ async function loadPriceOfferPrompt() {
     if (!promptText) {
         promptText = await tryLoad(`instructions/en/component_recognizer.txt`);
     }
-    return promptText || "Анализируйте компоненты компьютера и верните структурированный JSON.";
+    return promptText;
 }
 
 /**

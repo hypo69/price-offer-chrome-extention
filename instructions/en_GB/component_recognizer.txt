@@ -1,0 +1,21 @@
+
+On this page, you will find information about a computer component.
+Your task is to identify the following sections on the page:
+
+1. Component name
+2. Component description
+3. Component specifications
+4. Component image (if available)
+
+You must return a JSON object with the following fields:
+
+```json
+{
+  "title": "component name",
+  "description": "component description",
+  "specification": "component specifications",
+  "image_local_saved_path": "local path to the component image, if available, otherwise an empty string"
+}
+```
+
+---
