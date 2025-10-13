@@ -500,7 +500,7 @@ async function handleGenerateOffer(tab) {
 
         chrome.tabs.create({
             url: chrome.runtime.getURL('preview-offer.html'),
-            active: true
+            active: true,
         });
 
     } catch (ex) {

@@ -7,7 +7,6 @@
  * @returns {string|string[]|null} - Значение элемента или массив значений
  */
 function getElementValue(locator) {
-
     const { by, selector, attribute, if_list, mandatory, locator_description } = locator;
     let elements = [];
 
@@ -55,11 +54,14 @@ function getElementValue(locator) {
  */
 function executeLocators(locators) {
     const result = {};
-    // --- ИСПРАВЛЕНИЕ: Перебираем все ключи, а не только предопределенные ---
     for (const key in locators) {
-        // Проверяем, что это ключ самого объекта, а не прототипа
         if (Object.prototype.hasOwnProperty.call(locators, key)) {
-            result[key] = getElementValue(locators[key]);
+            try {
+                result[key] = getElementValue(locators[key]);
+            } catch (ex) {
+                console.error(`Ошибка обработки локатора "${key}":`, ex);
+                result[key] = locators[key].if_list === "all" ? [] : null;
+            }
         }
     }
     return result;

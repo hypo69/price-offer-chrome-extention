@@ -18,7 +18,7 @@ var __geminiModal = null;
 
 /**
  * Обработчик сообщений от background script
- * Функция получает команды на отображение UI-элементов
+ * Получает команды на отображение UI и извлечение данных
  */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.debug('[Content Script] Получено сообщение', { action: request.action });
@@ -28,25 +28,41 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true });
     }
 
+    if (request.action === 'extractComponent') {
+        extractComponent().then(data => sendResponse({ success: !!data, data }));
+    }
+
     return true;
 });
 
 /**
- * Отображение модального окна с контентом
- * Функция создает полноэкранное модальное окно для отображения результатов
- * 
- * Args:
- *     summary (string): Текст для отображения в модальном окне
+ * Извлечение данных компонента со страницы
+ * Использует executeLocators (глобально подключен через execute-locators.js)
+ */
+async function extractComponent() {
+    try {
+        const hostname = window.location.hostname.replace(/^www\./, '');
+        const locatorsPath = chrome.runtime.getURL(`locators/${hostname}.json`);
+        const response = await fetch(locatorsPath);
+        if (!response.ok) throw new Error(`Locators not found for ${hostname}`);
+        const locators = await response.json();
+
+        const result = executeLocators(locators);
+
+        chrome.runtime.sendMessage({ action: 'componentExtracted', data: result, url: window.location.href });
+        return result;
+    } catch (err) {
+        console.error('[Content Script] Ошибка извлечения компонента:', err);
+        chrome.runtime.sendMessage({ action: 'componentExtracted', error: err.message, url: window.location.href });
+        return null;
+    }
+}
+
+/**
+ * Отображение модального окна с результатом
  */
 function showSummary(summary) {
-    if (__geminiModal) {
-        console.debug('[Content Script] Модальное окно уже отображено');
-        return;
-    }
-
-    console.info('[Content Script] Отображение модального окна с результатом', {
-        summaryLength: summary.length
-    });
+    if (__geminiModal) return;
 
     const overlay = document.createElement('div');
     overlay.style.cssText = `
@@ -111,28 +127,15 @@ function showSummary(summary) {
         transition: all 0.2s;
     `;
 
-    closeBtn.onmouseover = () => {
-        closeBtn.style.background = '#e8eaed';
-        closeBtn.style.color = '#202124';
-    };
+    closeBtn.onmouseover = () => { closeBtn.style.background = '#e8eaed'; closeBtn.style.color = '#202124'; };
+    closeBtn.onmouseout = () => { closeBtn.style.background = '#f1f3f4'; closeBtn.style.color = '#5f6368'; };
 
-    closeBtn.onmouseout = () => {
-        closeBtn.style.background = '#f1f3f4';
-        closeBtn.style.color = '#5f6368';
-    };
-
-    /**
-     * Закрытие модального окна
-     * Функция удаляет модальное окно из DOM
-     */
     const closeModal = () => {
         if (__geminiModal && __geminiModal.parentNode) {
             __geminiModal.parentNode.removeChild(__geminiModal);
             __geminiModal = null;
-            console.info('[Content Script] Модальное окно закрыто');
         }
     };
-
     closeBtn.onclick = closeModal;
 
     modal.appendChild(closeBtn);
@@ -142,22 +145,10 @@ function showSummary(summary) {
 
     __geminiModal = overlay;
 
-    overlay.onclick = (e) => {
-        if (e.target === overlay) {
-            closeModal();
-        }
-    };
+    overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
 
-    const handleEscape = (e) => {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', handleEscape);
-        }
-    };
-
+    const handleEscape = (e) => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', handleEscape); } };
     document.addEventListener('keydown', handleEscape);
-
-    console.debug('[Content Script] Модальное окно успешно создано и отображено');
 }
 
 console.info('[Content Script] Content script полностью загружен и готов к работе');
