@@ -17,7 +17,7 @@
   "name": {
     "attribute": "innerText",
     "by": "XPATH",
-    "selector": "//h1[@itemprop = 'name']",
+    "selector": "//div[contains(@id,'_product_title')]//h1",
     "strategy_for_multiple_selectors": "find_first_match",
     "if_list": "last",
     "mandatory": true,

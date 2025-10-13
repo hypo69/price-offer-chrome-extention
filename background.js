@@ -337,7 +337,7 @@ async function handleAddComponent(tab) {
             if (!componentName || typeof componentName !== 'string' || componentName.trim() === '') {
                 err_msg = 'Не удалось определить имя компонента.\nПолученные данные: ' + componentName + '\nтип: ' + typeof (componentName);
                 await logger.error(err_msg, { data: data });
-                UIManager.showError(tab.id, err_msg , 4000, true);
+                UIManager.showError(tab.id, err_msg, 4000, true);
                 return;
             }
 

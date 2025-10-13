@@ -46,7 +46,8 @@
         "instructions/**/*",
         "locators/**/*",
         "chat.html",
-        "debug.html"
+        "debug.html",
+        "preview-offer.html"
       ],
       "matches": [ "<all_urls>" ]
     }

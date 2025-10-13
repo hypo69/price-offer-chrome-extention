@@ -3,12 +3,9 @@
 /**
  * Модуль для управления контекстным меню расширения
  * ==================================================
- * Инкапсулирует создание, обновление и конфигурацию меню.
  */
 class MenuManager {
-    // Конфигурация ID для пунктов меню
     static CONFIG = {
-        // ID для "Сформировать предложение" теперь будет вложенным
         GENERATE_OFFER_FROM_COMPONENTS_ID: 'generate-offer-from-components',
         ADD_COMPONENT_ID: 'add-component-action',
         SAVED_COMPONENTS_PARENT_ID: 'saved-components-parent',
@@ -16,52 +13,30 @@ class MenuManager {
         NO_SAVED_OFFERS_ID: 'no-saved-offers'
     };
 
-    // Ключ для хранения добавленных компонентов
     static STORAGE_KEY = 'addedComponents';
 
     constructor(logger) {
         this.logger = logger;
     }
 
-    /**
-     * Полностью инициализирует или пересоздает контекстное меню.
-     */
     async initialize() {
         chrome.contextMenus.removeAll();
 
-        // 1. Создание прямого пункта для ДОБАВЛЕНИЯ компонента
         chrome.contextMenus.create({
             id: MenuManager.CONFIG.ADD_COMPONENT_ID,
             title: 'Добавить компонент',
             contexts: ['page']
         });
 
-        // 2. Загрузка и создание меню для сохраненных КОМПОНЕНТОВ
-        // Эта функция теперь также отвечает за создание кнопки "Сформировать предложение"
         await this._createSavedComponentsMenu();
-
-        // Разделитель
-        chrome.contextMenus.create({
-            id: 'separator-1',
-            type: 'separator',
-            contexts: ['page']
-        });
-
-        // 3. Загрузка и создание меню для сохраненных ПРЕДЛОЖЕНИЙ
+        chrome.contextMenus.create({ id: 'separator-1', type: 'separator', contexts: ['page'] });
         await this._createSavedOffersMenu();
+
+        this._initializeClickHandler();
     }
 
-    /**
-     * Создает меню для сохраненных предложений из chrome.storage
-     * @private
-     */
     async _createSavedOffersMenu() {
-        chrome.contextMenus.create({
-            id: MenuManager.CONFIG.SAVED_OFFERS_PARENT_ID,
-            title: 'Сохраненные предложения',
-            contexts: ['page']
-        });
-
+        chrome.contextMenus.create({ id: MenuManager.CONFIG.SAVED_OFFERS_PARENT_ID, title: 'Сохраненные предложения', contexts: ['page'] });
         const { savedOffers = {} } = await chrome.storage.local.get('savedOffers');
         if (Object.keys(savedOffers).length === 0) {
             chrome.contextMenus.create({
@@ -84,23 +59,16 @@ class MenuManager {
         await this.logger.info(`Загружено ${Object.keys(savedOffers).length} сохраненных предложений в меню`);
     }
 
-    /**
-     * Создает меню для просмотра сохраненных компонентов.
-     * Если компоненты есть, также создает кнопку "Сформировать предложение".
-     * @private
-     */
     async _createSavedComponentsMenu() {
         const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
 
         if (components.length > 0) {
-            // Создаем родительский пункт "Сохраненные компоненты"
             chrome.contextMenus.create({
                 id: MenuManager.CONFIG.SAVED_COMPONENTS_PARENT_ID,
                 title: 'Сохраненные компоненты',
                 contexts: ['page']
             });
 
-            // --- НОВАЯ ЛОГИКА: Добавляем кнопку "Сформировать предложение" ВНУТРЬ ---
             chrome.contextMenus.create({
                 id: MenuManager.CONFIG.GENERATE_OFFER_FROM_COMPONENTS_ID,
                 parentId: MenuManager.CONFIG.SAVED_COMPONENTS_PARENT_ID,
@@ -108,17 +76,14 @@ class MenuManager {
                 contexts: ['page']
             });
 
-            // Добавляем разделитель
             chrome.contextMenus.create({
                 id: 'components-action-separator',
                 parentId: MenuManager.CONFIG.SAVED_COMPONENTS_PARENT_ID,
                 type: 'separator',
                 contexts: ['page']
             });
-            // --- КОНЕЦ НОВОЙ ЛОГИКИ ---
 
             for (const component of components) {
-                // 1. Создаем родительский пункт для самого компонента
                 chrome.contextMenus.create({
                     id: component.id,
                     parentId: MenuManager.CONFIG.SAVED_COMPONENTS_PARENT_ID,
@@ -126,7 +91,6 @@ class MenuManager {
                     contexts: ['page']
                 });
 
-                // 2. Создаем дочерний пункт для удаления этого компонента
                 chrome.contextMenus.create({
                     id: `delete-${component.id}`,
                     parentId: component.id,
@@ -138,17 +102,8 @@ class MenuManager {
         await this.logger.info(`Загружено ${components.length} сохраненных компонентов в меню`);
     }
 
-    /**
-     * Динамически добавляет новый пункт в меню сохраненных ПРЕДЛОЖЕНИЙ.
-     * @param {string} offerId - ID нового предложения
-     * @param {string} offerName - Имя нового предложения
-     */
     async addSavedOfferItem(offerId, offerName) {
-        try {
-            await chrome.contextMenus.remove(MenuManager.CONFIG.NO_SAVED_OFFERS_ID);
-        } catch (e) {
-            // Ошибки нет, если элемента не существует
-        }
+        try { await chrome.contextMenus.remove(MenuManager.CONFIG.NO_SAVED_OFFERS_ID); } catch { }
         chrome.contextMenus.create({
             id: offerId,
             parentId: MenuManager.CONFIG.SAVED_OFFERS_PARENT_ID,
@@ -158,10 +113,51 @@ class MenuManager {
         await this.logger.info(`Пункт меню "${offerName}" добавлен.`);
     }
 
-    /**
-     * Полностью перерисовывает меню. Используется после добавления или удаления.
-     */
-    async refreshMenu() {
-        await this.initialize();
+    async refreshMenu() { await this.initialize(); }
+
+    _initializeClickHandler() {
+        chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+            try {
+                switch (info.menuItemId) {
+
+                    // --- Основное: открыть preview-offer.html с компонентами ---
+                    case MenuManager.CONFIG.GENERATE_OFFER_FROM_COMPONENTS_ID:
+                        // Получаем все добавленные компоненты
+                        const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
+
+                        // Сохраняем их в отдельный ключ для preview-offer.html
+                        await chrome.storage.local.set({ 'componentsForOffer': components });
+
+                        // Проверяем, есть ли уже вкладка с preview-offer.html
+                        chrome.tabs.query({}, (tabs) => {
+                            const existingTab = tabs.find(tab => tab.url && tab.url.endsWith('preview-offer.html'));
+                            if (existingTab) {
+                                chrome.tabs.update(existingTab.id, { active: true });
+                            } else {
+                                chrome.tabs.create({ url: chrome.runtime.getURL('preview-offer.html') });
+                            }
+                        });
+                        await this.logger.info('Открыт файл preview-offer.html с компонентами');
+                        break;
+
+                    case MenuManager.CONFIG.ADD_COMPONENT_ID:
+                        await this.logger.info('Выбран пункт "Добавить компонент"');
+                        break;
+
+                    default:
+                        if (info.menuItemId.startsWith('delete-')) {
+                            const componentId = info.menuItemId.replace('delete-', '');
+                            const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
+                            const updatedComponents = components.filter(c => c.id !== componentId);
+                            await chrome.storage.local.set({ [MenuManager.STORAGE_KEY]: updatedComponents });
+                            await this.logger.info(`Компонент ${componentId} удален`);
+                            this.refreshMenu();
+                        }
+                        break;
+                }
+            } catch (ex) {
+                await this.logger.error('Ошибка при клике по пункту меню', ex, { exc_info: true });
+            }
+        });
     }
 }

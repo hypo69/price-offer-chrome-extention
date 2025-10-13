@@ -7,7 +7,7 @@
  * @returns {string|string[]|null} - Значение элемента или массив значений
  */
 function getElementValue(locator) {
-    
+
     const { by, selector, attribute, if_list, mandatory, locator_description } = locator;
     let elements = [];
 
