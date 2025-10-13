@@ -25,7 +25,7 @@ const logger = new Logger('__kazarinov_logs__', 100);
 - ✅ `content.js` - использование `console.*` с префиксами `[Content Script]`
 - ✅ `debug.js` - работа с логами
 - ✅ `result.js` - логирование операций с результатами
-- ✅ `execute_locators.js` - логирование извлечения данных
+- ✅ `execute-locators.js` - логирование извлечения данных
 
 ### 2. Улучшенная структура UIManager
 
@@ -259,7 +259,7 @@ await logger.error('Ошибка при работе с Gemini API', {
 - Улучшенная обработка ошибок
 - Информативные сообщения
 
-### execute_locators.js
+### execute-locators.js
 **До:**
 - console.error для ошибок
 - Минимальная информация в логах

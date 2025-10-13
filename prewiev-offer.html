@@ -1,0 +1,277 @@
+< !--offer - preview.html-- >
+< !DOCTYPE html >
+    <html lang="ru">
+        <head>
+            <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Предложение цены - Предпросмотр</title>
+                    <link rel="stylesheet" href="css/common.css">
+                        <style>
+                            * {
+                                margin: 0;
+                            padding: 0;
+                            box-sizing: border-box;
+        }
+
+                            body {
+                                font - family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            min-height: 100vh;
+                            padding: 20px;
+        }
+
+                            .container {
+                                max - width: 1200px;
+                            margin: 0 auto;
+                            background: white;
+                            border-radius: 16px;
+                            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                            overflow: hidden;
+        }
+
+                            .header {
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            padding: 30px 40px;
+                            position: relative;
+        }
+
+                            .header h1 {
+                                font - size: 28px;
+                            margin-bottom: 10px;
+        }
+
+                            .header .subtitle {
+                                font - size: 14px;
+                            opacity: 0.9;
+        }
+
+                            .header .actions {
+                                position: absolute;
+                            top: 30px;
+                            right: 40px;
+                            display: flex;
+                            gap: 10px;
+        }
+
+                            .header .actions button {
+                                background: rgba(255, 255, 255, 0.2);
+                            border: 1px solid rgba(255, 255, 255, 0.3);
+                            color: white;
+                            padding: 10px 20px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            transition: all 0.3s;
+        }
+
+                            .header .actions button:hover {
+                                background: rgba(255, 255, 255, 0.3);
+                            transform: translateY(-2px);
+        }
+
+                            .content {
+                                padding: 40px;
+        }
+
+                            .status {
+                                background: #f8f9fa;
+                            border-left: 4px solid #4285f4;
+                            padding: 15px 20px;
+                            margin-bottom: 30px;
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            gap: 15px;
+        }
+
+                            .status.processing {
+                                border - left - color: #fbbc04;
+        }
+
+                            .status.success {
+                                border - left - color: #0f9d58;
+        }
+
+                            .status.error {
+                                border - left - color: #db4437;
+        }
+
+                            .spinner {
+                                width: 20px;
+                            height: 20px;
+                            border: 3px solid #f3f3f3;
+                            border-top: 3px solid #4285f4;
+                            border-radius: 50%;
+                            animation: spin 1s linear infinite;
+        }
+
+                            @keyframes spin {
+                                0 % { transform: rotate(0deg); }
+            100% {transform: rotate(360deg); }
+        }
+
+                            .components-grid {
+                                display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+                            gap: 20px;
+                            margin-bottom: 30px;
+        }
+
+                            .component-card {
+                                background: white;
+                            border: 1px solid #e0e0e0;
+                            border-radius: 12px;
+                            padding: 20px;
+                            transition: all 0.3s;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+                            .component-card:hover {
+                                transform: translateY(-4px);
+                            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+                            .component-card h3 {
+                                color: #202124;
+                            font-size: 18px;
+                            margin-bottom: 15px;
+                            padding-bottom: 10px;
+                            border-bottom: 2px solid #667eea;
+        }
+
+                            .component-field {
+                                margin - bottom: 12px;
+        }
+
+                            .component-field label {
+                                display: block;
+                            font-size: 12px;
+                            color: #5f6368;
+                            margin-bottom: 4px;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+        }
+
+                            .component-field .value {
+                                color: #202124;
+                            font-size: 14px;
+                            line-height: 1.6;
+        }
+
+                            .component-field .value.empty {
+                                color: #999;
+                            font-style: italic;
+        }
+
+                            .component-field .value.array {
+                                display: flex;
+                            flex-wrap: wrap;
+                            gap: 6px;
+        }
+
+                            .component-field .value.array span {
+                                background: #e8eaed;
+                            padding: 4px 10px;
+                            border-radius: 12px;
+                            font-size: 13px;
+        }
+
+                            .component-image {
+                                width: 100%;
+                            height: 200px;
+                            object-fit: cover;
+                            border-radius: 8px;
+                            margin-top: 10px;
+                            border: 1px solid #e0e0e0;
+        }
+
+                            .result-section {
+                                background: #f8f9fa;
+                            border-radius: 12px;
+                            padding: 30px;
+                            margin-top: 30px;
+        }
+
+                            .result-section h2 {
+                                color: #202124;
+                            font-size: 24px;
+                            margin-bottom: 20px;
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+        }
+
+                            .result-content {
+                                background: white;
+                            border-radius: 8px;
+                            padding: 20px;
+                            max-height: 600px;
+                            overflow-y: auto;
+                            font-family: 'Courier New', monospace;
+                            font-size: 13px;
+                            line-height: 1.6;
+                            white-space: pre-wrap;
+                            word-break: break-word;
+        }
+
+                            .empty-state {
+                                text - align: center;
+                            padding: 60px 20px;
+                            color: #5f6368;
+        }
+
+                            .empty-state svg {
+                                width: 80px;
+                            height: 80px;
+                            margin-bottom: 20px;
+                            opacity: 0.5;
+        }
+
+                            .empty-state h3 {
+                                font - size: 20px;
+                            margin-bottom: 10px;
+        }
+
+                            .empty-state p {
+                                font - size: 14px;
+        }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <h1>Формирование предложения цены</h1>
+                                <p class="subtitle">Предпросмотр компонентов и результат от Gemini AI</p>
+                                <div class="actions">
+                                    <button id="copyResult">Копировать результат</button>
+                                    <button id="saveOffer">Сохранить предложение</button>
+                                </div>
+                            </div>
+
+                            <div class="content">
+                                <div id="status" class="status processing">
+                                    <div class="spinner"></div>
+                                    <span>Загрузка компонентов...</span>
+                                </div>
+
+                                <div id="componentsSection">
+                                    <h2 style="font-size: 20px; margin-bottom: 20px; color: #202124;">
+                                        📦 Компоненты (<span id="componentCount">0</span>)
+                                    </h2>
+                                    <div id="componentsGrid" class="components-grid"></div>
+                                </div>
+
+                                <div id="resultSection" class="result-section" style="display: none;">
+                                    <h2>
+                                        ✨ Результат от Gemini AI
+                                    </h2>
+                                    <div id="resultContent" class="result-content"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <script src="logger.js"></script>
+                        <script src="offer-preview.js"></script>
+                    </body>
+                </html>

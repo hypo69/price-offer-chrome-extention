@@ -1,19 +1,13 @@
-// execute_locators.js
+// execute-locators.js
 
 /**
  * ! Извлекает значение элемента по локатору
  *
  * @param {Object} locator - Один локатор из JSON
- * @param {string} locator.by - Стратегия поиска: XPATH, ID, CLASS, CSS_SELECTOR
- * @param {string} locator.selector - Селектор элемента
- * @param {string} locator.attribute - Атрибут для извлечения (innerText, value и т.д.)
- * @param {string} locator.if_list - "first" или "all" для множественных элементов
- * @param {boolean} locator.mandatory - Обязательный элемент или нет
- * @param {string} locator.locator_description - Описание локатора для логов
- *
  * @returns {string|string[]|null} - Значение элемента или массив значений
  */
 function getElementValue(locator) {
+    
     const { by, selector, attribute, if_list, mandatory, locator_description } = locator;
     let elements = [];
 
@@ -54,18 +48,18 @@ function getElementValue(locator) {
 }
 
 /**
- * ! Возвращает объект с title, description, specification и image_url
+ * ! Возвращает объект со всеми извлеченными данными
  *
  * @param {Object} locators - JSON с локаторами
- * @returns {Object} - { title, description, specification, image_url }
+ * @returns {Object} - Объект с извлеченными данными
  */
 function executeLocators(locators) {
     const result = {};
-    for (const key of ["title", "description", "specification", "image_url"]) {
-        if (locators[key]) {
+    // --- ИСПРАВЛЕНИЕ: Перебираем все ключи, а не только предопределенные ---
+    for (const key in locators) {
+        // Проверяем, что это ключ самого объекта, а не прототипа
+        if (Object.prototype.hasOwnProperty.call(locators, key)) {
             result[key] = getElementValue(locators[key]);
-        } else {
-            result[key] = null;
         }
     }
     return result;
