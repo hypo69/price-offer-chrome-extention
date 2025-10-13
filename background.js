@@ -3,21 +3,17 @@
 /**
  * Модуль фоновой службы расширения
  * =================================
- * Обработка контекстного меню, управление состоянием сборки компьютера
+ * Оркестрация событий и управление основной логикой.
  */
 
 // Импорт зависимостей
-importScripts('logger.js', 'ui-manager.js', 'gemini.js');
+importScripts('logger.js', 'ui-manager.js', 'gemini.js', 'menu.js');
 
-// Инициализация логгера
+// Инициализация сервисов
 const logger = new Logger('__kazarinov_logs__', 100);
+const menuManager = new MenuManager(logger);
 
-// Конфигурация
-const CONFIG = {
-    CONTEXT_MENU_ID: 'generate-offer',
-    ADD_COMPONENT_ID: 'add-component-from-locators',
-    SAVED_OFFERS_PARENT_ID: 'saved-offers-parent'
-};
+// --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ЛОГИКА ПРИЛОЖЕНИЯ ---
 
 /**
  * Обновление сборки компьютера в storage
@@ -69,30 +65,28 @@ async function showResultToUser(tabId, summary) {
 }
 
 /**
- * Сохранение предложения и добавление его в меню
+ * Сохранение предложения (логика и UI)
  */
 async function saveOffer(tabId, result) {
     const injectionResult = await chrome.scripting.executeScript({
         target: { tabId: tabId },
         func: () => prompt("Введите название для этого предложения:", `Предложение от ${new Date().toLocaleString()}`)
     });
+
     const offerName = injectionResult[0]?.result;
     if (!offerName || offerName.trim() === '') {
         await logger.info('Сохранение отменено пользователем.');
         return;
     }
+
     const offerId = `offer_${Date.now()}`;
     const newOffer = { name: offerName, data: result };
+
     const { savedOffers = {} } = await chrome.storage.local.get('savedOffers');
     savedOffers[offerId] = newOffer;
     await chrome.storage.local.set({ savedOffers });
-    chrome.contextMenus.create({
-        id: offerId,
-        parentId: CONFIG.SAVED_OFFERS_PARENT_ID,
-        title: offerName,
-        contexts: ['page']
-    });
-    await logger.info(`Предложение "${offerName}" сохранено с ID ${offerId}`);
+
+    await menuManager.addSavedOfferItem(offerId, offerName);
 }
 
 /**
@@ -151,7 +145,6 @@ async function extractPageText(tabId) {
 
 /**
  * Проверка доступности вкладки для работы расширения
- * ЭТА ФУНКЦИЯ БЫЛА ПРОПУЩЕНА
  */
 function isTabAccessible(tab) {
     if (!tab?.url) return false;
@@ -171,84 +164,12 @@ async function removeFromAssembly(productId) {
     });
 }
 
-/**
- * Инициализация контекстного меню
- */
-async function initializeContextMenu() {
-    chrome.contextMenus.removeAll();
-    chrome.contextMenus.create({
-        id: CONFIG.CONTEXT_MENU_ID,
-        title: chrome.i18n.getMessage('contextMenuTitle') || 'Сформировать предложение цены',
-        contexts: ['page']
-    });
-    chrome.contextMenus.create({
-        id: CONFIG.ADD_COMPONENT_ID,
-        title: 'Добавить компонент',
-        contexts: ['page']
-    });
-    try {
-        const resp = await fetch(chrome.runtime.getURL('data/products.json'));
-        if (!resp.ok) {
-            await logger.error('Не удалось загрузить products.json', { status: resp.status });
-        } else {
-            const data = await resp.json();
-            const products = data.ru?.products || [];
-            products.forEach(product => {
-                chrome.contextMenus.create({
-                    id: `product-${product.product_id}`,
-                    parentId: CONFIG.CONTEXT_MENU_ID,
-                    title: product.product_name,
-                    contexts: ['page']
-                });
-                chrome.contextMenus.create({
-                    id: `delete-${product.product_id}`,
-                    parentId: `product-${product.product_id}`,
-                    title: '❌ Удалить',
-                    contexts: ['page']
-                });
-            });
-            await logger.info(`Контекстное меню создано с ${products.length} продуктами`);
-        }
-    } catch (ex) {
-        await logger.error('Ошибка создания контекстного меню для продуктов', { error: ex.message });
-    }
-    chrome.contextMenus.create({
-        id: 'separator-1',
-        type: 'separator',
-        contexts: ['page']
-    });
-    chrome.contextMenus.create({
-        id: CONFIG.SAVED_OFFERS_PARENT_ID,
-        title: 'Сохраненные предложения',
-        contexts: ['page']
-    });
-    const { savedOffers = {} } = await chrome.storage.local.get('savedOffers');
-    if (Object.keys(savedOffers).length === 0) {
-        chrome.contextMenus.create({
-            id: 'no-saved-offers',
-            parentId: CONFIG.SAVED_OFFERS_PARENT_ID,
-            title: '(пока пусто)',
-            enabled: false,
-            contexts: ['page']
-        });
-    } else {
-        for (const [offerId, offer] of Object.entries(savedOffers)) {
-            chrome.contextMenus.create({
-                id: offerId,
-                parentId: CONFIG.SAVED_OFFERS_PARENT_ID,
-                title: offer.name,
-                contexts: ['page']
-            });
-        }
-    }
-    await logger.info(`Загружено ${Object.keys(savedOffers).length} сохраненных предложений в меню`);
-}
 
-// --- ОБРАБОТЧИКИ СОБЫТИЙ ---
+// --- ОБРАБОТЧИКИ СОБЫТИЙ РАСШИРЕНИЯ ---
 
 chrome.runtime.onInstalled.addListener(async () => {
     await logger.info('Расширение установлено/обновлено');
-    await initializeContextMenu();
+    await menuManager.initialize();
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -257,17 +178,24 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         await logger.warn('Попытка использования на недоступной странице', { url: tab.url });
         return;
     }
+
     const menuItemId = info.menuItemId;
-    if (menuItemId === CONFIG.ADD_COMPONENT_ID) {
+    const MENU_CONFIG = MenuManager.CONFIG;
+
+    // Нажали на кнопку "Извлечь и добавить текущий компонент"
+    if (menuItemId === MENU_CONFIG.EXTRACT_AND_ADD_COMPONENT_ID) {
         UIManager.showIndicator(tab.id, 'Извлечение данных...');
         await logger.info('Начало извлечения данных по локаторам', { tabId: tab.id });
+
         const url = new URL(tab.url);
         const hostname = url.hostname.replace(/^www\./, "");
         const locatorPath = `locators/${hostname}.json`;
+
         try {
             const response = await fetch(chrome.runtime.getURL(locatorPath));
             if (!response.ok) throw new Error(`Не удалось загрузить локаторы для ${hostname}`);
             const locators = await response.json();
+
             chrome.scripting.executeScript({
                 target: { tabId: tab.id },
                 func: (locators) => {
@@ -313,22 +241,37 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                 args: [locators]
             }, async (results) => {
                 UIManager.hideIndicator(tab.id);
-                if (chrome.runtime.lastError) {
-                    await logger.error('Ошибка выполнения скрипта локаторов', { error: chrome.runtime.lastError.message });
-                    UIManager.showError(tab.id, 'Ошибка выполнения скрипта');
+                if (chrome.runtime.lastError || !results || !results[0]?.result) {
+                    const errorMsg = chrome.runtime.lastError ? chrome.runtime.lastError.message : 'Данные не найдены';
+                    await logger.error('Ошибка извлечения компонента', { error: errorMsg });
+                    UIManager.showError(tab.id, 'Не удалось извлечь данные');
                     return;
                 }
-                if (results && results[0]?.result) {
-                    const data = results[0].result;
-                    const formattedResult = JSON.stringify(data, null, 2);
-                    await chrome.storage.local.set({ lastOffer: formattedResult });
-                    await logger.info('Данные по локаторам успешно извлечены', { data });
-                    await showResultToUser(tab.id, formattedResult);
-                } else {
-                    await logger.warn('Данные по локаторам не найдены', { tabId: tab.id });
-                    UIManager.showError(tab.id, 'Не удалось найти элементы по локаторам');
+
+                const data = results[0].result;
+                const componentName = data.name;
+
+                if (!componentName || typeof componentName !== 'string' || componentName.trim() === '') {
+                    await logger.warn('Имя компонента не найдено после извлечения.', { data });
+                    UIManager.showError(tab.id, 'Не удалось определить имя компонента');
+                    return;
                 }
+
+                const newComponent = {
+                    id: `component_${Date.now()}`,
+                    name: componentName.trim(),
+                    data: data
+                };
+
+                const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
+                components.push(newComponent);
+                await chrome.storage.local.set({ [MenuManager.STORAGE_KEY]: components });
+
+                await menuManager.addExtractedComponentItem(newComponent);
+
+                await showResultToUser(tab.id, JSON.stringify(data, null, 2));
             });
+
         } catch (e) {
             UIManager.hideIndicator(tab.id);
             await logger.error('Ошибка загрузки или обработки локаторов', { error: e.message });
@@ -336,6 +279,23 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }
         return;
     }
+
+    // Нажали на один из уже добавленных компонентов в подменю
+    if (menuItemId.startsWith('component_')) {
+        const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
+        const foundComponent = components.find(c => c.id === menuItemId);
+
+        if (foundComponent) {
+            await logger.info(`Показ сохраненного компонента: ${foundComponent.name}`);
+            await showResultToUser(tab.id, JSON.stringify(foundComponent.data, null, 2));
+        } else {
+            await logger.error(`Сохраненный компонент с ID ${menuItemId} не найден`);
+            UIManager.showError(tab.id, 'Ошибка: компонент не найден');
+        }
+        return;
+    }
+
+    // Нажали на сохраненное ПРЕДЛОЖЕНИЕ
     if (menuItemId.startsWith('offer_')) {
         const { savedOffers = {} } = await chrome.storage.local.get('savedOffers');
         const savedOffer = savedOffers[menuItemId];
@@ -348,12 +308,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }
         return;
     }
+
+    // Нажали "удалить" продукт
     if (menuItemId.startsWith('delete-')) {
         const productId = menuItemId.replace('delete-', '');
         await removeFromAssembly(productId);
+        await menuManager.initialize();
         return;
     }
-    if (menuItemId === CONFIG.CONTEXT_MENU_ID || menuItemId.startsWith('product-')) {
+
+    // Нажали "Сформировать предложение" или один из продуктов
+    if (menuItemId === MENU_CONFIG.CONTEXT_MENU_ID || menuItemId.startsWith('product-')) {
         UIManager.showIndicator(tab.id, 'Формируется предложение...');
         await logger.info('Начало обработки предложения', { menuItemId });
         const text = await extractPageText(tab.id);
