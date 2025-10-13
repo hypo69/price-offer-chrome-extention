@@ -1,68 +1,61 @@
 // execute-locators.js
 
 /**
- * ! Извлекает значение элемента по локатору
- *
- * @param {Object} locator - Один локатор из JSON
- * @returns {string|string[]|null} - Значение элемента или массив значений
+ * Вспомогательные функции для извлечения данных по локаторам
  */
+
 function getElementValue(locator) {
     const { by, selector, attribute, if_list, mandatory, locator_description } = locator;
     let elements = [];
 
     try {
-        if (by === "XPATH") {
-            const iterator = document.evaluate(selector, document, null, XPathResult.ORDERED_NODE_ITERATOR_TYPE, null);
+        if (by === 'XPATH') {
+            const iterator = document.evaluate(
+                selector,
+                document,
+                null,
+                XPathResult.ORDERED_NODE_ITERATOR_TYPE,
+                null
+            );
             let node = iterator.iterateNext();
             while (node) {
                 elements.push(node);
                 node = iterator.iterateNext();
             }
-        } else if (by === "ID") {
+        } else if (by === 'ID') {
             const el = document.getElementById(selector);
             if (el) elements.push(el);
-        } else if (by === "CLASS") {
-            const els = document.getElementsByClassName(selector);
-            elements = Array.from(els);
-        } else if (by === "CSS_SELECTOR") {
-            const els = document.querySelectorAll(selector);
-            elements = Array.from(els);
+        } else if (by === 'CLASS') {
+            elements = Array.from(document.getElementsByClassName(selector));
+        } else if (by === 'CSS_SELECTOR') {
+            elements = Array.from(document.querySelectorAll(selector));
         }
 
         if (!elements.length) {
-            if (mandatory) console.error(`Mandatory locator not found: ${locator_description}`);
-            return if_list === "all" ? [] : null;
+            if (mandatory) console.error(`Обязательный локатор не найден: ${locator_description}`);
+            return if_list === 'all' ? [] : null;
         }
 
-        if (if_list === "all") {
+        if (if_list === 'all') {
             return elements.map(el => el[attribute] ?? el.getAttribute(attribute));
         } else {
-            const el = elements[0];
-            return el[attribute] ?? el.getAttribute(attribute);
+            return elements[0][attribute] ?? elements[0].getAttribute(attribute);
         }
-    } catch (e) {
-        console.error(`Error extracting locator ${locator_description}:`, e);
-        return if_list === "all" ? [] : null;
+
+    } catch (ex) {
+        console.error(`Ошибка извлечения локатора ${locator_description}:`, ex);
+        return if_list === 'all' ? [] : null;
     }
 }
 
-/**
- * ! Возвращает объект со всеми извлеченными данными
- *
- * @param {Object} locators - JSON с локаторами
- * @returns {Object} - Объект с извлеченными данными
- */
 function executeLocators(locators) {
     const result = {};
     for (const key in locators) {
-        if (Object.prototype.hasOwnProperty.call(locators, key)) {
-            try {
-                result[key] = getElementValue(locators[key]);
-            } catch (ex) {
-                console.error(`Ошибка обработки локатора "${key}":`, ex);
-                result[key] = locators[key].if_list === "all" ? [] : null;
-            }
-        }
+        result[key] = getElementValue(locators[key]);
     }
     return result;
 }
+
+// Делаем доступными в глобальной области для background.js
+window.executeLocators = executeLocators;
+window.getElementValue = getElementValue;

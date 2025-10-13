@@ -1,19 +1,6 @@
 {
   "supplier_prefix": "morlevi.co.il",
 
-  "id_manufacturer": {
-    "attribute": "innerText",
-    "by": "XPATH",
-    "selector": "//span[@class = 'ltr sku-copy']",
-    "strategy_for_multiple_selectors": "find_first_match",
-    "if_list": "first",
-    "mandatory": true,
-    "text_to_be_present_in_element": "",
-    "event": null,
-    "timeout_for_event": "presence_of_element_located",
-    "timeout": 0,
-    "locator_description": "Артикул производителя (SKU) morlevi.co.il"
-  },
 
   "default_image_url": {
     "attribute": "href",
@@ -92,18 +79,5 @@
     "timeout_for_event": "presence_of_element_located",
     "timeout": 0,
     "locator_description": "PrestaShop: Характеристики товара morlevi.co.il"
-  },
-
-  "brand": {
-    "attribute": "innerText",
-    "by": "XPATH",
-    "selector": "//span[contains(text(), 'Brand')]/parent::td/following-sibling::td/span[contains(@class, 'po-break-word')]",
-    "strategy_for_multiple_selectors": "find_first_match",
-    "if_list": "first",
-    "mandatory": true,
-    "event": null,
-    "timeout_for_event": "presence_of_element_located",
-    "timeout": 0,
-    "locator_description": "PrestaShop: Производитель (бренд) товара morlevi.co.il"
   }
 }

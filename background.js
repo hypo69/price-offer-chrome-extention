@@ -251,113 +251,58 @@ async function handleAddComponent(tab) {
             locatorsCount: Object.keys(locators).length
         });
 
+        // Здесь мы вызываем execute-locators напрямую в контексте страницы
         chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: (locators) => {
-                /**
-                 * Извлечение значения элемента по локатору
-                 */
-                function getElementValue(locator) {
-                    const { by, selector, attribute, if_list, mandatory, locator_description } = locator;
-                    let elements = [];
+            files: ['execute-locators.js']
+        }, () => {
+            chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: (locators) => {
+                    return window.executeLocators(locators);
+                },
+                args: [locators],
+            }, async (results) => {
+                UIManager.hideIndicator(tab.id);
 
-                    try {
-                        if (by === 'XPATH') {
-                            const iterator = document.evaluate(
-                                selector,
-                                document,
-                                null,
-                                XPathResult.ORDERED_NODE_ITERATOR_TYPE,
-                                null
-                            );
-                            let node = iterator.iterateNext();
-                            while (node) {
-                                elements.push(node);
-                                node = iterator.iterateNext();
-                            }
-                        } else if (by === 'ID') {
-                            const el = document.getElementById(selector);
-                            if (el) {
-                                elements.push(el);
-                            }
-                        } else if (by === 'CLASS') {
-                            elements = Array.from(document.getElementsByClassName(selector));
-                        } else if (by === 'CSS_SELECTOR') {
-                            elements = Array.from(document.querySelectorAll(selector));
-                        }
+                if (chrome.runtime.lastError || !results || !results[0]?.result) {
+                    const errorMsg = chrome.runtime.lastError
+                        ? chrome.runtime.lastError.message
+                        : 'Данные не найдены';
 
-                        if (!elements.length) {
-                            if (mandatory) {
-                                console.error(`Обязательный локатор не найден: ${locator_description}`);
-                            }
-                            return if_list === 'all' ? [] : null;
-                        }
-
-                        if (if_list === 'all') {
-                            return elements.map(el => el[attribute] ?? el.getAttribute(attribute));
-                        } else {
-                            return elements[0][attribute] ?? elements[0].getAttribute(attribute);
-                        }
-                    } catch (ex) {
-                        console.error(`Ошибка извлечения локатора ${locator_description}:`, ex);
-                        return if_list === 'all' ? [] : null;
-                    }
+                    await logger.error('Ошибка извлечения компонента', { error: errorMsg });
+                    UIManager.showError(tab.id, 'Не удалось извлечь данные', 4000, true);
+                    return;
                 }
 
-                /**
-                 * Выполнение всех локаторов
-                 */
-                function executeLocators(locators) {
-                    const result = {};
-                    for (const key in locators) {
-                        result[key] = getElementValue(locators[key]);
-                    }
-                    return result;
+                const data = results[0].result;
+                const componentName = data.name;
+
+                if (!componentName || typeof componentName !== 'string' || componentName.trim() === '') {
+                    const err_msg = 'Не удалось определить имя компонента.\nПолученные данные: ' + componentName + '\nтип: ' + typeof (componentName);
+                    await logger.error(err_msg, { data: data });
+                    UIManager.showError(tab.id, err_msg, 4000, true);
+                    return;
                 }
 
-                return executeLocators(locators);
-            },
-            args: [locators]
-        }, async (results) => {
-            UIManager.hideIndicator(tab.id);
+                const newComponent = {
+                    id: `component_${Date.now()}`,
+                    name: componentName.trim(),
+                    data: data
+                };
 
-            if (chrome.runtime.lastError || !results || !results[0]?.result) {
-                const errorMsg = chrome.runtime.lastError
-                    ? chrome.runtime.lastError.message
-                    : 'Данные не найдены';
+                const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
+                components.push(newComponent);
+                await chrome.storage.local.set({ [MenuManager.STORAGE_KEY]: components });
 
-                await logger.error('Ошибка извлечения компонента', { error: errorMsg });
-                UIManager.showError(tab.id, 'Не удалось извлечь данные', 4000, true);
-                return;
-            }
+                await menuManager.refreshMenu();
 
-            const data = results[0].result;
-            const componentName = data.name;
+                UIManager.showError(tab.id, `Компонент "${componentName.trim()}" добавлен!`, 2500, false);
 
-            if (!componentName || typeof componentName !== 'string' || componentName.trim() === '') {
-                err_msg = 'Не удалось определить имя компонента.\nПолученные данные: ' + componentName + '\nтип: ' + typeof (componentName);
-                await logger.error(err_msg, { data: data });
-                UIManager.showError(tab.id, err_msg, 4000, true);
-                return;
-            }
-
-            const newComponent = {
-                id: `component_${Date.now()}`,
-                name: componentName.trim(),
-                data: data
-            };
-
-            const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
-            components.push(newComponent);
-            await chrome.storage.local.set({ [MenuManager.STORAGE_KEY]: components });
-
-            await menuManager.refreshMenu();
-
-            UIManager.showError(tab.id, `Компонент "${componentName.trim()}" добавлен!`, 2500, false);
-
-            await logger.info('Компонент успешно добавлен', {
-                componentId: newComponent.id,
-                componentName: newComponent.name
+                await logger.info('Компонент успешно добавлен', {
+                    componentId: newComponent.id,
+                    componentName: newComponent.name
+                });
             });
         });
 
@@ -373,10 +318,6 @@ async function handleAddComponent(tab) {
 
 /**
  * Обработка удаления компонента
- * Функция удаляет компонент из хранилища и обновляет меню
- * 
- * Args:
- *     menuItemId (string): ID пункта меню (формат: delete-component_XXXX)
  */
 async function handleDeleteComponent(menuItemId) {
     const componentId = menuItemId.replace('delete-', '');
@@ -402,11 +343,6 @@ async function handleDeleteComponent(menuItemId) {
 
 /**
  * Обработка копирования JSON компонента
- * Функция копирует данные компонента в буфер обмена
- * 
- * Args:
- *     menuItemId (string): ID компонента
- *     tab (Object): Объект вкладки Chrome
  */
 async function handleCopyComponent(menuItemId, tab) {
     try {
@@ -445,11 +381,6 @@ async function handleCopyComponent(menuItemId, tab) {
 
 /**
  * Обработка загрузки сохраненного предложения
- * Функция отображает ранее сохраненное предложение
- * 
- * Args:
- *     menuItemId (string): ID предложения
- *     tab (Object): Объект вкладки Chrome
  */
 async function handleLoadOffer(menuItemId, tab) {
     try {
@@ -479,10 +410,6 @@ async function handleLoadOffer(menuItemId, tab) {
 
 /**
  * Обработка формирования предложения из компонентов
- * Функция открывает новую вкладку с предпросмотром компонентов
- * 
- * Args:
- *     tab (Object): Объект вкладки Chrome
  */
 async function handleGenerateOffer(tab) {
     try {

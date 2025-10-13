@@ -1,19 +1,6 @@
 {
   "supplier_prefix": "ivory.co.il",
 
-  "id_manufacturer": {
-    "attribute": "innerText",
-    "by": "XPATH",
-    "selector": "",
-    "strategy_for_multiple_selectors": "find_first_match",
-    "if_list": "first",
-    "mandatory": true,
-    "text_to_be_present_in_element": "",
-    "event": null,
-    "timeout_for_event": "presence_of_element_located",
-    "timeout": 0,
-    "locator_description": "prestaShop: id производителя товара ivory.co.il"
-  },
 
   "default_image_url": {
     "attribute": "src",
@@ -68,18 +55,6 @@
     "locator_description": "prestaShop: характеристики товара ivory.co.il"
   },
 
-  "brand": {
-    "attribute": "innerText",
-    "by": "XPATH",
-    "selector": "//span[contains(text(), 'Brand')]/parent::td/following-sibling::td/span[contains(@class, 'po-break-word')]",
-    "strategy_for_multiple_selectors": "find_first_match",
-    "if_list": "first",
-    "mandatory": true,
-    "event": null,
-    "timeout_for_event": "presence_of_element_located",
-    "timeout": 0,
-    "locator_description": "prestaShop: производитель (бренд) товара ivory.co.il"
-  },
   "summary": {
     "attribute": "innerHTML",
     "by": "XPATH",
@@ -103,31 +78,5 @@
     "timeout_for_event": "presence_of_element_located",
     "timeout": 0,
     "locator_description": "полное описание товара (дополнительно) ivory.co.il"
-  },
-  "screenshot": {
-    "attribute": null,
-    "by": "XPATH",
-    "selector": "//img[@id='landingImage']|//img[@class='a-dynamic-image']",
-    "strategy_for_multiple_selectors": "find_first_match",
-    "if_list": "first",
-    "mandatory": true,
-    "logic for action[and|or|xor|value|null]": null,
-    "event": "screenshot()",
-    "timeout_for_event": "presence_of_element_located",
-    "timeout": 0,
-    "locator_description": "скриншот основного изображения товара ivory.co.il"
-  },
-  "images_urls": {
-    "attribute": "{src:alt}",
-    "by": "XPATH",
-    "selector": "//div[@class = 'carousel-inner']//img",
-    "strategy_for_multiple_selectors": "find_first_match",
-    "if_list": "first",
-    "mandatory": true,
-    "text_to_be_present_in_element": "",
-    "event": null,
-    "timeout_for_event": "presence_of_element_located",
-    "timeout": 0,
-    "locator_description": "url-ы дополнительных изображений товара ivory.co.il"
   }
 }

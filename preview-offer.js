@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Выводим каждый компонент
         componentsForOffer.forEach(c => {
+            // Преобразуем объект в JSON для alert
+            alert(JSON.stringify(c, null, 2));
+
             const div = document.createElement('div');
             div.className = 'component';
 
