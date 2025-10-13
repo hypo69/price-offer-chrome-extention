@@ -1,53 +1,83 @@
+// chat.js
+
+let tabId = null;
 let chatHistory = [];
-let model = 'gemini-1.5-flash';
+let model = 'gemini-2.5-flash';
 let apiKey = '';
 
 async function init() {
+    const params = new URLSearchParams(window.location.search);
+    tabId = parseInt(params.get('tabId'));
+    const pageUrl = decodeURIComponent(params.get('url') || '');
+
     const settings = await chrome.storage.sync.get(['geminiApiKey', 'geminiModel']);
     apiKey = settings.geminiApiKey;
-    model = settings.geminiModel || 'gemini-1.5-flash';
+    model = settings.geminiModel || 'gemini-2.5-flash';
 
     if (!apiKey) {
-        addMessage("API ключ не задан. Открываю настройки...", 'ai');
-        setTimeout(() => chrome.runtime.openOptionsPage(), 1500);
+        alert('Сначала сохраните API-ключ в настройках!');
+        window.close();
         return;
     }
 
-    addMessage('Готов генерировать детальный анализ. Задайте вопрос.', 'ai');
+    const results = await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        func: () => document.body.innerText || document.documentElement.innerText
+    });
+
+    const pageText = results?.[0]?.result || '';
+    if (!pageText) {
+        addMessage('Не удалось получить текст страницы.', 'ai');
+        return;
+    }
+
+    addMessage('Анализирую страницу...', 'ai');
+    setStatus('Генерация подробного анализа...');
+
+    try {
+        const prompt = `Проанализируй следующий текст подробно, выдели ключевые идеи, аргументы и выводы. Структурируй ответ:\n\n${pageText.substring(0, 10000)}`;
+        const response = await callGemini(prompt);
+        addMessage(response, 'ai');
+        chatHistory.push({ role: 'user', parts: [{ text: prompt }] });
+        chatHistory.push({ role: 'model', parts: [{ text: response }] });
+    } catch (error) {
+        addMessage(`Ошибка: ${error.message}`, 'ai');
+    } finally {
+        setStatus('');
+    }
 }
 
-async function callGemini(prompt, history) {
-    const contents = [
-        ...history.map(msg => ({
-            role: msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.text }]
-        })),
-        { role: 'user', parts: [{ text: prompt }] }
-    ];
-
+async function callGemini(prompt) {
     const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents })
+            body: JSON.stringify({
+                contents: [...chatHistory, { role: 'user', parts: [{ text: prompt }] }]
+            })
         }
     );
 
     const data = await response.json();
-    if (!response.ok || data.error) {
-        throw new Error(data.error?.message || `HTTP ${response.status}`);
+    if (data.error) {
+        throw new Error(data.error.message || 'Ошибка API');
     }
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Нет ответа';
+
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Без ответа';
 }
 
 function addMessage(text, role) {
     const chat = document.getElementById('chat');
     const msg = document.createElement('div');
     msg.className = `message ${role}`;
-    msg.textContent = text;
+    msg.innerHTML = text; // ← используем innerHTML, если нужно HTML
     chat.appendChild(msg);
     chat.scrollTop = chat.scrollHeight;
+}
+
+function setStatus(text) {
+    document.getElementById('status').textContent = text;
 }
 
 document.getElementById('send').addEventListener('click', sendMessage);
@@ -62,20 +92,17 @@ async function sendMessage() {
 
     addMessage(text, 'user');
     input.value = '';
-    addMessage("Думаю...", 'ai loading');
+    setStatus('Думаю...');
 
     try {
-        const responseText = await callGemini(text, chatHistory);
-
-        // Удаляем "Думаю..."
-        document.querySelector('.loading')?.remove();
-
-        addMessage(responseText, 'ai');
-        chatHistory.push({ role: 'user', text });
-        chatHistory.push({ role: 'model', text: responseText });
-    } catch (e) {
-        document.querySelector('.loading')?.remove();
-        addMessage(`Ошибка: ${e.message}`, 'ai');
+        const response = await callGemini(text);
+        addMessage(response, 'ai');
+        chatHistory.push({ role: 'user', parts: [{ text }] });
+        chatHistory.push({ role: 'model', parts: [{ text: response }] });
+    } catch (error) {
+        addMessage(`Ошибка: ${error.message}`, 'ai');
+    } finally {
+        setStatus('');
     }
 }
 
