@@ -1,9 +1,9 @@
 // gemini.js
 
-window.GeminiAPI = window.GeminiAPI || {};
+const GeminiAPI = {};
 
 /**
- * Загружает содержимое промпта для текущей локали
+ * Внутренняя функция для загрузки содержимого промпта для текущей локали
  */
 async function loadPriceOfferPrompt() {
     let locale = 'en';
@@ -34,31 +34,66 @@ async function loadPriceOfferPrompt() {
 }
 
 /**
- * Генерирует предложение цены через Gemini API
+ * Внутренняя функция для отправки запроса к Gemini API
+ * @param {string} fullPrompt - Полный текст промпта для отправки
+ * @param {string} apiKey - API ключ
+ * @param {string} model - Название модели
+ * @returns {Promise<string>} - Текстовый результат от модели
  */
-window.GeminiAPI.generatePriceOffer = async (pageText, apiKey, model) => {
-    const instructions = await loadPriceOfferPrompt();
-    const prompt = `${instructions}\n\n${pageText.substring(0, 10000)}`;
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+async function _sendRequestToGemini(fullPrompt, apiKey, model) {
+    const url = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
+            contents: [{ parts: [{ text: fullPrompt }] }]
         })
     });
 
     const data = await response.json();
+
     if (data.error) {
-        throw new Error(data.error.message || "Ошибка Gemini API");
+        console.error("Gemini API Error Response:", data.error);
+        const error = new Error(data.error.message || "Неизвестная ошибка Gemini API");
+        error.details = data.error;
+        throw error;
+    }
+
+    if (!data.candidates || data.candidates.length === 0) {
+        const blockReason = data.promptFeedback?.blockReason || "Неизвестная причина";
+        console.error("Gemini API Blocked Response:", data.promptFeedback);
+        const error = new Error(`Ответ от модели пуст или заблокирован. Причина: ${blockReason}`);
+        error.details = data.promptFeedback || { message: "Кандидаты отсутствуют в ответе" };
+        throw error;
     }
 
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!resultText) {
-        throw new Error("Пустой ответ от модели");
+        throw new Error("Пустой ответ от модели, хотя кандидаты присутствуют.");
     }
 
     return resultText;
+}
+
+
+/**
+ * Главная функция: формирует предложение цены, инкапсулируя всю логику
+ * @param {string} pageText - Текст со страницы для анализа
+ * @param {string} apiKey - API ключ
+ * @param {string} model - Название модели
+ * @returns {Promise<string>} - Готовый JSON в виде строки
+ */
+GeminiAPI.getFullPriceOffer = async (pageText, apiKey, model) => {
+    // 1. Загружаем инструкции (промпт)
+    const instructions = await loadPriceOfferPrompt();
+    if (!instructions) {
+        throw new Error("Не удалось загрузить инструкции для модели.");
+    }
+
+    // 2. Формируем полный промпт, обрезая текст страницы, чтобы избежать превышения лимитов
+    const fullPrompt = `${instructions}\n\n${pageText.substring(0, 10000)}`;
+
+    // 3. Отправляем запрос и возвращаем результат
+    return await _sendRequestToGemini(fullPrompt, apiKey, model);
 };

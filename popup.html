@@ -1,3 +1,4 @@
+<!--popup.html-->
 <!DOCTYPE html>
 <html>
 <head>
@@ -21,6 +22,12 @@
             color: white;
             border: none;
             border-radius: 4px;
+            cursor: pointer;
+        }
+        /* Стиль для кнопки логов */
+        #openLogs {
+            background-color: #6c757d;
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -29,12 +36,26 @@
     <input type="password" id="apiKey" placeholder="AIzaSy...">
     <label>Модель</label>
     <select id="model">
-        <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
         <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+        <option value="gemini-2.5-flash" selected>gemini-2.5-flash</option>
+        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
     </select>
     <button id="save">Сохранить</button>
 
-    <script src="popup.js"></script>
+    <h3>Extract Elements</h3>
+    <label for="selectorType">Selector type:</label>
+    <select id="selectorType">
+        <option value="xpath">XPath</option>
+        <option value="id">ID</option>
+        <option value="class">CSS Class</option>
+    </select>
+    <input type="text" id="selectorValue" placeholder="Enter selector">
+    <button id="extractBtn">Extract</button>
+    <pre id="output"></pre>
+    <script type="module" src="popup.js"></script>
+
+    <button id="openLogs">Просмотреть логи</button>
+
+    
 </body>
 </html>

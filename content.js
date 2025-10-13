@@ -2,8 +2,9 @@
 if (window.__gemini_content_script_loaded) return;
 window.__gemini_content_script_loaded = true;
 
-let __geminiIndicator = null;
-let __geminiModal = null;
+// Используем var, чтобы избежать SyntaxError при повторном внедрении скрипта
+var __geminiIndicator = null;
+var __geminiModal = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "showSummary") {

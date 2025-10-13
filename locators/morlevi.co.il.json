@@ -1,0 +1,109 @@
+{
+  "supplier_prefix": "morlevi.co.il",
+
+  "id_manufacturer": {
+    "attribute": "innerText",
+    "by": "XPATH",
+    "selector": "//span[@class = 'ltr sku-copy']",
+    "strategy_for_multiple_selectors": "find_first_match",
+    "if_list": "first",
+    "mandatory": true,
+    "text_to_be_present_in_element": "",
+    "event": null,
+    "timeout_for_event": "presence_of_element_located",
+    "timeout": 0,
+    "locator_description": "Артикул производителя (SKU) morlevi.co.il"
+  },
+
+  "default_image_url": {
+    "attribute": "href",
+    "by": "ID",
+    "selector": "mainpic",
+    "strategy_for_multiple_selectors": "find_first_match",
+    "if_list": "first",
+    "mandatory": true,
+    "text_to_be_present_in_element": "",
+    "event": null,
+    "timeout_for_event": "presence_of_element_located",
+    "timeout": 0,
+    "locator_description": "URL главного изображения товара morlevi.co.il"
+  },
+
+  "price": {
+    "attribute": "innerText",
+    "by": "XPATH",
+    "selector": "//span[@id='basicPrice']",
+    "strategy_for_multiple_selectors": "find_first_match",
+    "if_list": "first",
+    "mandatory": false,
+    "text_to_be_present_in_element": "",
+    "event": null,
+    "timeout_for_event": "presence_of_element_located",
+    "timeout": 0,
+    "locator_description": "PrestaShop: Розничная цена товара morlevi.co.il"
+  },
+  "name": {
+    "attribute": "innerText",
+    "by": "XPATH",
+    "selector": "//div[contains(@class, 'product-header')]//h1",
+    "strategy_for_multiple_selectors": "find_first_match",
+    "if_list": "first",
+    "mandatory": true,
+    "text_to_be_present_in_element": "",
+    "event": null,
+    "timeout_for_event": "presence_of_element_located",
+    "timeout": 0,
+    "locator_description": "PrestaShop: Название товара morlevi.co.il"
+  },
+  "description_short": {
+    "attribute": "innerText",
+    "by": "XPATH",
+    "selector": "(//div[contains(@class, 'description')])[2]//div | (//div[contains(@class, 'description')])[2]//p",
+    "strategy_for_multiple_selectors": "find_first_match",
+    "if_list": "all",
+    "mandatory": false,
+    "text_to_be_present_in_element": "",
+    "event": null,
+    "timeout_for_event": "presence_of_element_located",
+    "timeout": 0,
+    "locator_description": "PrestaShop: Краткое описание товара morlevi.co.il"
+  },
+  "description": {
+    "attribute": "innerText",
+    "by": "XPATH",
+    "selector": "//div[@id='productDescription']",
+    "strategy_for_multiple_selectors": "find_first_match",
+    "if_list": "first",
+    "mandatory": true,
+    "event": null,
+    "timeout_for_event": "presence_of_element_located",
+    "timeout": 0,
+    "locator_description": "Полное описание товара (дополнительно) morlevi.co.il"
+  },
+  "specification": {
+    "attribute": "innerHTML",
+    "by": "XPATH",
+    "selector": "//div[contains(@class, 'product-params')]//li",
+    "strategy_for_multiple_selectors": "find_first_match",
+    "if_list": "all",
+    "mandatory": true,
+    "text_to_be_present_in_element": "",
+    "event": null,
+    "timeout_for_event": "presence_of_element_located",
+    "timeout": 0,
+    "locator_description": "PrestaShop: Характеристики товара morlevi.co.il"
+  },
+
+  "brand": {
+    "attribute": "innerText",
+    "by": "XPATH",
+    "selector": "//span[contains(text(), 'Brand')]/parent::td/following-sibling::td/span[contains(@class, 'po-break-word')]",
+    "strategy_for_multiple_selectors": "find_first_match",
+    "if_list": "first",
+    "mandatory": true,
+    "event": null,
+    "timeout_for_event": "presence_of_element_located",
+    "timeout": 0,
+    "locator_description": "PrestaShop: Производитель (бренд) товара morlevi.co.il"
+  }
+}

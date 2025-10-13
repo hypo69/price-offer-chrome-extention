@@ -1,301 +1,379 @@
 // background.js
 
-// --- КОПИЯ ЛОГИКИ ИЗ "КОРОЧЕ!" ---
+/**
+ * Модуль фоновой службы расширения
+ * =================================
+ * Обработка контекстного меню, управление состоянием сборки компьютера
+ */
 
-function showIndicatorOnPage(tabId, message) {
-    chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        func: (msg) => {
-            let el = document.getElementById('__gemini_indicator__');
-            if (el) el.remove();
-            el = document.createElement('div');
-            el.id = '__gemini_indicator__';
-            el.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: rgba(0,0,0,0.88);
-                color: white;
-                padding: 12px 16px;
-                border-radius: 8px;
-                font-family: system-ui, sans-serif;
-                font-size: 14px;
-                z-index: 2147483647;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                max-width: 320px;
-                text-align: center;
-                pointer-events: none;
-            `;
-            el.textContent = msg;
-            document.body.appendChild(el);
-        },
-        args: [message]
-    });
+// Импорт зависимостей
+importScripts('logger.js', 'ui-manager.js', 'gemini.js');
+
+// Инициализация логгера
+const logger = new Logger('__kazarinov_logs__', 100);
+
+// Конфигурация
+const CONFIG = {
+    CONTEXT_MENU_ID: 'generate-offer',
+    ADD_COMPONENT_ID: 'add-component-from-locators',
+    SAVED_OFFERS_PARENT_ID: 'saved-offers-parent'
+};
+
+/**
+ * Обновление сборки компьютера в storage
+ */
+async function updateAssembly(productId) {
+    if (!productId) return false;
+    try {
+        const stored = await chrome.storage.local.get('assembly');
+        let assembly = stored.assembly || { products: [] };
+        const resp = await fetch(chrome.runtime.getURL('data/products.json'));
+        if (!resp.ok) {
+            await logger.error('Не удалось загрузить products.json', { status: resp.status });
+            return false;
+        }
+        const productsData = await resp.json();
+        const product = productsData.ru?.products.find(p => p.product_id === productId);
+        if (!product) {
+            await logger.warn(`Продукт ${productId} не найден в базе`);
+            return false;
+        }
+        if (!assembly.products.some(p => p.product_id === productId)) {
+            assembly.products.push(product);
+            await chrome.storage.local.set({ assembly });
+            await logger.info(`Продукт ${productId} добавлен в сборку`);
+            return true;
+        }
+        await logger.debug(`Продукт ${productId} уже в сборке`);
+        return true;
+    } catch (ex) {
+        await logger.error('Ошибка обновления сборки', { error: ex.message, productId });
+        return false;
+    }
 }
 
-function hideIndicatorOnPage(tabId) {
+/**
+ * Отображение результата пользователю
+ */
+async function showResultToUser(tabId, summary) {
     chrome.scripting.executeScript({
         target: { tabId: tabId },
-        func: () => {
-            const el = document.getElementById('__gemini_indicator__');
-            if (el) el.remove();
+        func: () => !!window.__gemini_content_script_loaded
+    }, (results) => {
+        if (results?.[0]?.result) {
+            chrome.tabs.sendMessage(tabId, { action: 'showSummary', summary });
+        } else {
+            UIManager.showModal(tabId, summary);
         }
     });
 }
 
-function showErrorOnPage(tabId, message) {
-    showIndicatorOnPage(tabId, message);
-    setTimeout(() => hideIndicatorOnPage(tabId), 4000);
-}
-
-function showSummaryDirectly(tabId, summary) {
-    chrome.scripting.executeScript({
+/**
+ * Сохранение предложения и добавление его в меню
+ */
+async function saveOffer(tabId, result) {
+    const injectionResult = await chrome.scripting.executeScript({
         target: { tabId: tabId },
-        func: (text) => {
-            const old = document.getElementById('__gemini_modal_fallback__');
-            if (old) old.remove();
-
-            const overlay = document.createElement('div');
-            overlay.id = '__gemini_modal_fallback__';
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                background: rgba(0,0,0,0.6);
-                z-index: 2147483646;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                padding: 20px;
-            `;
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                background: white;
-                border-radius: 12px;
-                width: 100%;
-                max-width: 600px;
-                max-height: 80vh;
-                padding: 20px;
-                font-family: system-ui, sans-serif;
-                overflow: auto;
-            `;
-            modal.textContent = text;
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-
-            const close = () => {
-                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-            };
-            overlay.onclick = close;
-            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-        },
-        args: [summary]
+        func: () => prompt("Введите название для этого предложения:", `Предложение от ${new Date().toLocaleString()}`)
     });
+    const offerName = injectionResult[0]?.result;
+    if (!offerName || offerName.trim() === '') {
+        await logger.info('Сохранение отменено пользователем.');
+        return;
+    }
+    const offerId = `offer_${Date.now()}`;
+    const newOffer = { name: offerName, data: result };
+    const { savedOffers = {} } = await chrome.storage.local.get('savedOffers');
+    savedOffers[offerId] = newOffer;
+    await chrome.storage.local.set({ savedOffers });
+    chrome.contextMenus.create({
+        id: offerId,
+        parentId: CONFIG.SAVED_OFFERS_PARENT_ID,
+        title: offerName,
+        contexts: ['page']
+    });
+    await logger.info(`Предложение "${offerName}" сохранено с ID ${offerId}`);
 }
 
-// --- ЗАГРУЗКА ПРОМПТА ---
-async function loadPriceOfferPrompt() {
-    let locale = 'en';
-    try {
-        const currentLocale = chrome.i18n.getUILanguage();
-        if (currentLocale.startsWith('ru')) locale = 'ru';
-        else if (currentLocale.startsWith('he')) locale = 'he';
-    } catch (e) {
-        console.warn("Не удалось определить локаль, используем en");
-    }
-
-    const url = chrome.runtime.getURL(`instructions/${locale}/price_offer_prompt.txt`);
-    try {
-        const res = await fetch(url);
-        if (res.ok) return await res.text();
-    } catch (e) {
-        console.warn(`Файл ${url} не найден`);
-    }
-
-    // Fallback на английский
-    const fallbackUrl = chrome.runtime.getURL(`instructions/en/price_offer_prompt.txt`);
-    try {
-        const res = await fetch(fallbackUrl);
-        if (res.ok) return await res.text();
-    } catch (e) {
-        console.warn("Английский промпт тоже не найден");
-    }
-
-    return "Анализируйте компоненты компьютера и верните структурированный JSON.";
-}
-
-// --- ВЫЗОВ GEMINI ---
-async function summarizeWithGemini(text, tabId, productId = null) {
+/**
+ * Обработка анализа текста через Gemini API
+ */
+async function processWithGemini(text, tabId, productId = null) {
     const { geminiApiKey, geminiModel } = await chrome.storage.sync.get(['geminiApiKey', 'geminiModel']);
-    const model = geminiModel || 'gemini-2.5-flash';
-
     if (!geminiApiKey) {
+        await logger.warn('API ключ не установлен, открытие настроек');
         chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
         return;
     }
-
-    const instructions = await loadPriceOfferPrompt();
-    const prompt = `Анализируйте компоненты компьютера из следующего текста:\n\n${text.substring(0, 10000)}\n\n${instructions}`;
-
+    await logger.info('Начало обработки через Gemini', { model: geminiModel, textLength: text.length });
     try {
-        const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }]
-                })
-            }
-        );
-
-        const data = await response.json();
-
-        if (data.error) {
-            throw new Error(data.error.message || "Ошибка Gemini API");
-        }
-
-        const summary = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!summary) {
-            throw new Error("Пустой ответ от модели");
-        }
-
-        // Сохраняем в assembly
+        const result = await GeminiAPI.getFullPriceOffer(text, geminiApiKey, geminiModel);
         if (productId) {
-            const stored = await chrome.storage.local.get("assembly");
-            let assembly = stored.assembly || { products: [] };
-            try {
-                const resp = await fetch(chrome.runtime.getURL('data/products.json'));
-                const productsData = await resp.json();
-                const product = productsData.ru?.products.find(p => p.product_id === productId);
-                if (product && !assembly.products.some(p => p.product_id === productId)) {
-                    assembly.products.push(product);
-                    await chrome.storage.local.set({ assembly });
-                }
-            } catch (e) {
-                console.warn("Не удалось обновить assembly", e);
-            }
+            await updateAssembly(productId);
         }
-
-        // Сохраняем результат
-        await chrome.storage.local.set({ lastOffer: summary });
-
-        // Показываем результат
-        chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            func: () => !!window.__gemini_content_script_loaded
-        }, (results) => {
-            if (results?.[0]?.result) {
-                chrome.tabs.sendMessage(tabId, { action: "showSummary", summary });
-            } else {
-                showSummaryDirectly(tabId, summary);
-            }
+        await chrome.storage.local.set({ lastOffer: result });
+        await logger.info('Результат успешно получен и сохранен как lastOffer');
+        await showResultToUser(tabId, JSON.stringify(JSON.parse(result), null, 2));
+        await saveOffer(tabId, result);
+    } catch (ex) {
+        await logger.error('Ошибка при работе с Gemini API', {
+            message: ex.message,
+            details: ex.details || 'Дополнительные детали отсутствуют.',
+            stack: ex.stack,
+            productId
         });
-
-    } catch (error) {
-        console.error("Ошибка Gemini:", error);
-        let msg = error.message || "Неизвестная ошибка";
-        showErrorOnPage(tabId, `Gemini: ${msg.substring(0, 50)}`);
+        const errorMsg = `Gemini: ${ex.message.substring(0, 100)}`;
+        UIManager.showError(tabId, errorMsg);
     }
 }
 
-// --- СОЗДАНИЕ МЕНЮ ---
-chrome.runtime.onInstalled.addListener(() => {
-    chrome.contextMenus.removeAll();
-
-    chrome.contextMenus.create({
-        id: "generate-offer",
-        title: chrome.i18n.getMessage('contextMenuTitle') || 'Сформировать предложение цены',
-        contexts: ["page"]
+/**
+ * Извлечение текста со страницы
+ */
+async function extractPageText(tabId) {
+    return new Promise((resolve) => {
+        chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            func: () => document.body.innerText || document.documentElement.innerText
+        }, (results) => {
+            if (chrome.runtime.lastError) {
+                logger.error('Ошибка извлечения текста', { error: chrome.runtime.lastError.message });
+                resolve(null); return;
+            }
+            const text = results?.[0]?.result;
+            if (!text || text.trim().length < 10) {
+                resolve(null); return;
+            }
+            resolve(text);
+        });
     });
+}
 
-    // Загрузка продуктов
-    fetch(chrome.runtime.getURL('data/products.json'))
-        .then(r => r.json())
-        .then(data => {
+/**
+ * Проверка доступности вкладки для работы расширения
+ * ЭТА ФУНКЦИЯ БЫЛА ПРОПУЩЕНА
+ */
+function isTabAccessible(tab) {
+    if (!tab?.url) return false;
+    const restrictedProtocols = ['chrome://', 'edge://', 'about:', 'file://'];
+    return !restrictedProtocols.some(protocol => tab.url.startsWith(protocol));
+}
+
+/**
+ * Удаление продукта из сборки
+ */
+async function removeFromAssembly(productId) {
+    chrome.storage.local.get('assembly', async (stored) => {
+        let assembly = stored.assembly || { products: [] };
+        assembly.products = assembly.products.filter(p => p.product_id !== productId);
+        await chrome.storage.local.set({ assembly });
+        await logger.info(`Продукт ${productId} удален из сборки`);
+    });
+}
+
+/**
+ * Инициализация контекстного меню
+ */
+async function initializeContextMenu() {
+    chrome.contextMenus.removeAll();
+    chrome.contextMenus.create({
+        id: CONFIG.CONTEXT_MENU_ID,
+        title: chrome.i18n.getMessage('contextMenuTitle') || 'Сформировать предложение цены',
+        contexts: ['page']
+    });
+    chrome.contextMenus.create({
+        id: CONFIG.ADD_COMPONENT_ID,
+        title: 'Добавить компонент',
+        contexts: ['page']
+    });
+    try {
+        const resp = await fetch(chrome.runtime.getURL('data/products.json'));
+        if (!resp.ok) {
+            await logger.error('Не удалось загрузить products.json', { status: resp.status });
+        } else {
+            const data = await resp.json();
             const products = data.ru?.products || [];
             products.forEach(product => {
                 chrome.contextMenus.create({
                     id: `product-${product.product_id}`,
-                    parentId: "generate-offer",
+                    parentId: CONFIG.CONTEXT_MENU_ID,
                     title: product.product_name,
-                    contexts: ["page"]
+                    contexts: ['page']
                 });
                 chrome.contextMenus.create({
                     id: `delete-${product.product_id}`,
                     parentId: `product-${product.product_id}`,
                     title: '❌ Удалить',
-                    contexts: ["page"]
+                    contexts: ['page']
                 });
             });
-        })
-        .catch(e => console.warn('products.json не загружен', e));
-});
-
-// --- ОБРАБОТКА КЛИКОВ ---
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-    if (!tab?.url ||
-        tab.url.startsWith('chrome://') ||
-        tab.url.startsWith('edge://') ||
-        tab.url.startsWith('about:') ||
-        tab.url.startsWith('file://')) {
-        chrome.notifications.create({
-            type: 'basic',
-            iconUrl: 'icons/icon48.png',
-            title: 'Price Offer Generator',
-            message: 'Действие недоступно на внутренних или локальных страницах.'
-        });
-        return;
+            await logger.info(`Контекстное меню создано с ${products.length} продуктами`);
+        }
+    } catch (ex) {
+        await logger.error('Ошибка создания контекстного меню для продуктов', { error: ex.message });
     }
-
-    const id = info.menuItemId;
-
-    if (id.startsWith('delete-')) {
-        const productId = id.replace('delete-', '');
-        chrome.storage.local.get("assembly", (stored) => {
-            let assembly = stored.assembly || { products: [] };
-            assembly.products = assembly.products.filter(p => p.product_id !== productId);
-            chrome.storage.local.set({ assembly }, () => {
-                console.log(`Product ${productId} removed from assembly`);
-            });
-        });
-        return;
-    }
-
-    // Для всех остальных — запускаем обработку
-    showIndicatorOnPage(tab.id, "Формируется предложение...");
-
-    chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => document.body.innerText || document.documentElement.innerText
-    }, (results) => {
-        hideIndicatorOnPage(tab.id);
-
-        if (chrome.runtime.lastError) {
-            showErrorOnPage(tab.id, "Не удалось получить текст");
-            return;
-        }
-
-        const text = results?.[0]?.result;
-        if (!text || text.trim().length < 10) {
-            showErrorOnPage(tab.id, "Страница содержит мало контента");
-            return;
-        }
-
-        let productId = null;
-        if (id.startsWith('product-')) {
-            productId = id.replace('product-', '');
-        }
-
-        summarizeWithGemini(text, tab.id, productId);
+    chrome.contextMenus.create({
+        id: 'separator-1',
+        type: 'separator',
+        contexts: ['page']
     });
+    chrome.contextMenus.create({
+        id: CONFIG.SAVED_OFFERS_PARENT_ID,
+        title: 'Сохраненные предложения',
+        contexts: ['page']
+    });
+    const { savedOffers = {} } = await chrome.storage.local.get('savedOffers');
+    if (Object.keys(savedOffers).length === 0) {
+        chrome.contextMenus.create({
+            id: 'no-saved-offers',
+            parentId: CONFIG.SAVED_OFFERS_PARENT_ID,
+            title: '(пока пусто)',
+            enabled: false,
+            contexts: ['page']
+        });
+    } else {
+        for (const [offerId, offer] of Object.entries(savedOffers)) {
+            chrome.contextMenus.create({
+                id: offerId,
+                parentId: CONFIG.SAVED_OFFERS_PARENT_ID,
+                title: offer.name,
+                contexts: ['page']
+            });
+        }
+    }
+    await logger.info(`Загружено ${Object.keys(savedOffers).length} сохраненных предложений в меню`);
+}
+
+// --- ОБРАБОТЧИКИ СОБЫТИЙ ---
+
+chrome.runtime.onInstalled.addListener(async () => {
+    await logger.info('Расширение установлено/обновлено');
+    await initializeContextMenu();
 });
 
-// --- ОБРАБОТЧИКИ ---
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "openChat") {
-        chrome.tabs.create({ url: chrome.runtime.getURL("chat.html") });
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    if (!isTabAccessible(tab)) {
+        UIManager.showNotification('Price Offer Generator', 'Действие недоступно на этой странице.');
+        await logger.warn('Попытка использования на недоступной странице', { url: tab.url });
+        return;
+    }
+    const menuItemId = info.menuItemId;
+    if (menuItemId === CONFIG.ADD_COMPONENT_ID) {
+        UIManager.showIndicator(tab.id, 'Извлечение данных...');
+        await logger.info('Начало извлечения данных по локаторам', { tabId: tab.id });
+        const url = new URL(tab.url);
+        const hostname = url.hostname.replace(/^www\./, "");
+        const locatorPath = `locators/${hostname}.json`;
+        try {
+            const response = await fetch(chrome.runtime.getURL(locatorPath));
+            if (!response.ok) throw new Error(`Не удалось загрузить локаторы для ${hostname}`);
+            const locators = await response.json();
+            chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: (locators) => {
+                    function getElementValue(locator) {
+                        const { by, selector, attribute, if_list, mandatory, locator_description } = locator;
+                        let elements = [];
+                        try {
+                            if (by === "XPATH") {
+                                const iterator = document.evaluate(selector, document, null, XPathResult.ORDERED_NODE_ITERATOR_TYPE, null);
+                                let node = iterator.iterateNext();
+                                while (node) { elements.push(node); node = iterator.iterateNext(); }
+                            } else if (by === "ID") {
+                                const el = document.getElementById(selector);
+                                if (el) elements.push(el);
+                            } else if (by === "CLASS") {
+                                elements = Array.from(document.getElementsByClassName(selector));
+                            } else if (by === "CSS_SELECTOR") {
+                                elements = Array.from(document.querySelectorAll(selector));
+                            }
+                            if (!elements.length) {
+                                if (mandatory) console.error(`Mandatory locator not found: ${locator_description}`);
+                                return if_list === "all" ? [] : null;
+                            }
+                            if (if_list === "all") {
+                                return elements.map(el => el[attribute] ?? el.getAttribute(attribute));
+                            } else {
+                                return elements[0][attribute] ?? elements[0].getAttribute(attribute);
+                            }
+                        } catch (e) {
+                            console.error(`Error extracting locator ${locator_description}:`, e);
+                            return if_list === "all" ? [] : null;
+                        }
+                    }
+                    function executeLocators(locators) {
+                        const result = {};
+                        for (const key in locators) {
+                            result[key] = getElementValue(locators[key]);
+                        }
+                        return result;
+                    }
+                    return executeLocators(locators);
+                },
+                args: [locators]
+            }, async (results) => {
+                UIManager.hideIndicator(tab.id);
+                if (chrome.runtime.lastError) {
+                    await logger.error('Ошибка выполнения скрипта локаторов', { error: chrome.runtime.lastError.message });
+                    UIManager.showError(tab.id, 'Ошибка выполнения скрипта');
+                    return;
+                }
+                if (results && results[0]?.result) {
+                    const data = results[0].result;
+                    const formattedResult = JSON.stringify(data, null, 2);
+                    await chrome.storage.local.set({ lastOffer: formattedResult });
+                    await logger.info('Данные по локаторам успешно извлечены', { data });
+                    await showResultToUser(tab.id, formattedResult);
+                } else {
+                    await logger.warn('Данные по локаторам не найдены', { tabId: tab.id });
+                    UIManager.showError(tab.id, 'Не удалось найти элементы по локаторам');
+                }
+            });
+        } catch (e) {
+            UIManager.hideIndicator(tab.id);
+            await logger.error('Ошибка загрузки или обработки локаторов', { error: e.message });
+            UIManager.showError(tab.id, `Ошибка: ${e.message}`);
+        }
+        return;
+    }
+    if (menuItemId.startsWith('offer_')) {
+        const { savedOffers = {} } = await chrome.storage.local.get('savedOffers');
+        const savedOffer = savedOffers[menuItemId];
+        if (savedOffer) {
+            await logger.info(`Загрузка сохраненного предложения: ${savedOffer.name}`);
+            await showResultToUser(tab.id, JSON.stringify(JSON.parse(savedOffer.data), null, 2));
+        } else {
+            await logger.error(`Сохраненное предложение с ID ${menuItemId} не найдено`);
+            UIManager.showError(tab.id, 'Ошибка: предложение не найдено');
+        }
+        return;
+    }
+    if (menuItemId.startsWith('delete-')) {
+        const productId = menuItemId.replace('delete-', '');
+        await removeFromAssembly(productId);
+        return;
+    }
+    if (menuItemId === CONFIG.CONTEXT_MENU_ID || menuItemId.startsWith('product-')) {
+        UIManager.showIndicator(tab.id, 'Формируется предложение...');
+        await logger.info('Начало обработки предложения', { menuItemId });
+        const text = await extractPageText(tab.id);
+        UIManager.hideIndicator(tab.id);
+        if (!text) {
+            UIManager.showError(tab.id, 'Не удалось получить текст страницы');
+            await logger.error('Страница содержит мало контента');
+            return;
+        }
+        let productId = null;
+        if (menuItemId.startsWith('product-')) {
+            productId = menuItemId.replace('product-', '');
+        }
+        await processWithGemini(text, tab.id, productId);
+    }
+});
+
+chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+    if (request.action === 'openChat') {
+        chrome.tabs.create({ url: chrome.runtime.getURL('chat.html') });
+        await logger.info('Открыта страница чата');
     }
 });
