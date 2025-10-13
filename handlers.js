@@ -180,6 +180,11 @@ async function handleLoadOffer(menuItemId, tab) {
 }
 
 /**
+ * Глобальный флаг, чтобы не открывать несколько вкладок preview-offer одновременно
+ */
+let isOpeningPreviewTab = false;
+
+/**
  * Обработка формирования предложения из компонентов
  */
 async function handleGenerateOffer(tab) {
@@ -193,21 +198,28 @@ async function handleGenerateOffer(tab) {
         }
 
         await chrome.storage.local.set({ componentsForOffer: components });
+        await logger.info('Открытие страницы предпросмотра предложения', { componentsCount: components.length });
 
-        await logger.info('Открытие страницы предпросмотра предложения', {
-            componentsCount: components.length
-        });
-
-        chrome.tabs.query({ url: chrome.runtime.getURL('preview-offer.html') }, (tabs) => {
-            if (tabs.length > 0) {
-                chrome.tabs.update(tabs[0].id, { active: true });
-            } else {
-                chrome.tabs.create({
-                    url: chrome.runtime.getURL('preview-offer.html'),
-                    active: true
-                });
+        if (isOpeningPreviewTab) {
+            const existingTabs = await chrome.tabs.query({ url: chrome.runtime.getURL('preview-offer.html') });
+            if (existingTabs.length > 0) {
+                await chrome.tabs.update(existingTabs[0].id, { active: true });
             }
-        });
+            return;
+        }
+
+        isOpeningPreviewTab = true;
+
+        const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL('preview-offer.html') });
+        if (tabs.length > 0) {
+            await chrome.tabs.update(tabs[0].id, { active: true });
+        } else {
+            const newTab = await chrome.tabs.create({
+                url: chrome.runtime.getURL('preview-offer.html'),
+                active: true
+            });
+            await chrome.storage.local.set({ previewOfferTabId: newTab.id });
+        }
 
     } catch (ex) {
         await logger.error('Ошибка открытия страницы предложения', {
@@ -215,6 +227,8 @@ async function handleGenerateOffer(tab) {
             stack: ex.stack
         });
         UIManager.showError(tab.id, 'Ошибка открытия предложения', 4000, true);
+    } finally {
+        isOpeningPreviewTab = false;
     }
 }
 
