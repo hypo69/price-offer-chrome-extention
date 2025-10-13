@@ -3,22 +3,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('componentsContainer');
 
     try {
-        // Получаем компоненты для отображения
         const storageResult = await chrome.storage.local.get('componentsForOffer');
         const componentsForOffer = storageResult.componentsForOffer ?? [];
-
-        console.log('Loaded componentsForOffer:', componentsForOffer); // для отладки
 
         if (!componentsForOffer.length) {
             container.innerHTML = '<p>Нет компонентов для отображения.</p>';
             return;
         }
 
-        // Выводим каждый компонент
-        componentsForOffer.forEach(c => {
-            // Преобразуем объект в JSON для alert
-            alert(JSON.stringify(c, null, 2));
+        // Собираем все компоненты в один JSON
+        const combinedJSON = componentsForOffer.map(c => ({
+            id: c.id ?? null,
+            name: c.name ?? 'Без имени',
+            data: c.data ?? {}
+        }));
 
+        // Для отладки выводим весь JSON
+        console.log('Combined JSON:', combinedJSON);
+        alert(JSON.stringify(combinedJSON, null, 2));
+
+        // Выводим компоненты на страницу
+        componentsForOffer.forEach(c => {
             const div = document.createElement('div');
             div.className = 'component';
 
@@ -32,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             div.appendChild(description);
             container.appendChild(div);
         });
+
     } catch (ex) {
         console.error('Ошибка при загрузке компонентов', ex);
         container.innerHTML = '<p>Произошла ошибка при загрузке компонентов.</p>';
