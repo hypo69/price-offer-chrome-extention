@@ -8,10 +8,8 @@
  * Загрузка и отображение данных от Gemini API
  */
 
-/**
- * Инициализация страницы предложения
- * Функция загружает данные из storage и отображает их
- */
+import './json2html.js'; // подключаем внешний модуль json2html
+
 document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('componentsContainer');
 
@@ -106,7 +104,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentView = viewType;
 
             if (viewType === 'html') {
-                const jsonHTML = json2html(parsedData);
+                const jsonHTML = json2html(parsedData, 0, true); // выводим только значения
                 dataContainer.innerHTML = jsonHTML;
                 dataContainer.style.cssText = `
                     background-color: #ffffff;
@@ -139,7 +137,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (isJSON) {
             renderView('html');
-
             htmlViewBtn.addEventListener('click', () => renderView('html'));
             jsonViewBtn.addEventListener('click', () => renderView('json'));
         } else {
@@ -241,9 +238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         container.innerHTML = '';
         container.appendChild(header);
-        if (isJSON) {
-            container.appendChild(viewToggle);
-        }
+        if (isJSON) container.appendChild(viewToggle);
         container.appendChild(dataContainer);
         container.appendChild(buttonContainer);
 
@@ -254,193 +249,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         container.innerHTML = `<p style="color: #db4437; padding: 20px;">Произошла ошибка при загрузке данных предложения: ${ex.message}</p>`;
     }
 });
-
-/**
- * Подсветка синтаксиса JSON
- * Функция добавляет HTML-разметку для цветной подсветки JSON
- * 
- * Args:
- *     json (string): JSON строка для подсветки
- * 
- * Returns:
- *     string: HTML с подсветкой синтаксиса
- */
-function syntaxHighlightJSON(json) {
-    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
-        let cls = 'json-number';
-        if (/^"/.test(match)) {
-            if (/:$/.test(match)) {
-                cls = 'json-key';
-            } else {
-                cls = 'json-string';
-            }
-        } else if (/true|false/.test(match)) {
-            cls = 'json-boolean';
-        } else if (/null/.test(match)) {
-            cls = 'json-null';
-        }
-        return `<span class="${cls}">${match}</span>`;
-    });
-}
-
-/**
- * Конвертация JSON в HTML
- * Функция преобразует JSON объект в читаемую HTML-структуру
- * 
- * Args:
- *     json (Object|Array|string|number|boolean|null): JSON данные для конвертации
- *     level (number): Уровень вложенности (по умолчанию 0)
- * 
- * Returns:
- *     string: HTML представление JSON
- */
-function json2html(json, level = 0) {
-    const indent = level * 20;
-
-    if (json === null) {
-        return `<span class="json-null">null</span>`;
-    }
-
-    if (typeof json === 'boolean') {
-        return `<span class="json-boolean">${json}</span>`;
-    }
-
-    if (typeof json === 'number') {
-        return `<span class="json-number">${json}</span>`;
-    }
-
-    if (typeof json === 'string') {
-        const escaped = json.replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-        return `<span class="json-string">"${escaped}"</span>`;
-    }
-
-    if (Array.isArray(json)) {
-        if (json.length === 0) {
-            return '<span class="json-bracket">[]</span>';
-        }
-
-        let html = '<div class="json-array">';
-        html += '<span class="json-bracket">[</span>';
-
-        json.forEach((item, index) => {
-            html += `<div class="json-item" style="margin-left: ${indent + 20}px;">`;
-            html += json2html(item, level + 1);
-            if (index < json.length - 1) {
-                html += '<span class="json-comma">,</span>';
-            }
-            html += '</div>';
-        });
-
-        html += `<div style="margin-left: ${indent}px;"><span class="json-bracket">]</span></div>`;
-        html += '</div>';
-
-        return html;
-    }
-
-    if (typeof json === 'object') {
-        const keys = Object.keys(json);
-
-        if (keys.length === 0) {
-            return '<span class="json-bracket">{}</span>';
-        }
-
-        let html = '<div class="json-object">';
-        html += '<span class="json-bracket">{</span>';
-
-        keys.forEach((key, index) => {
-            html += `<div class="json-property" style="margin-left: ${indent + 20}px;">`;
-            html += `<span class="json-key">"${key}"</span>`;
-            html += '<span class="json-colon">: </span>';
-            html += json2html(json[key], level + 1);
-            if (index < keys.length - 1) {
-                html += '<span class="json-comma">,</span>';
-            }
-            html += '</div>';
-        });
-
-        html += `<div style="margin-left: ${indent}px;"><span class="json-bracket">}</span></div>`;
-        html += '</div>';
-
-        return html;
-    }
-
-    return String(json);
-}
-
-const style = document.createElement('style');
-style.textContent = `
-    .json-key { 
-        color: #881391; 
-        font-weight: 600; 
-    }
-    .json-string { 
-        color: #1A1AA6; 
-    }
-    .json-number { 
-        color: #164; 
-        font-weight: 500;
-    }
-    .json-boolean { 
-        color: #219; 
-        font-weight: 600; 
-    }
-    .json-null { 
-        color: #900; 
-        font-weight: 600; 
-    }
-    .json-bracket {
-        color: #333;
-        font-weight: 600;
-    }
-    .json-colon {
-        color: #666;
-    }
-    .json-comma {
-        color: #666;
-    }
-    .json-object,
-    .json-array {
-        margin: 2px 0;
-    }
-    .json-property,
-    .json-item {
-        margin: 4px 0;
-        padding: 2px 0;
-    }
-    .json-property:hover,
-    .json-item:hover {
-        background-color: #f8f9fa;
-        margin-left: -4px !important;
-        padding-left: 4px;
-        border-radius: 3px;
-    }
-    
-    .view-toggle-btn {
-        padding: 8px 16px;
-        border: 1px solid #dadce0;
-        background-color: #ffffff;
-        color: #5f6368;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 13px;
-        font-weight: 500;
-        transition: all 0.2s;
-    }
-    
-    .view-toggle-btn:hover {
-        background-color: #f8f9fa;
-        border-color: #4285f4;
-    }
-    
-    .view-toggle-btn.active {
-        background-color: #4285f4;
-        color: #ffffff;
-        border-color: #4285f4;
-    }
-`;
-document.head.appendChild(style);
