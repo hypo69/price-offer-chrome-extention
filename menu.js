@@ -29,15 +29,26 @@ class MenuManager {
         });
 
         await this._createSavedComponentsMenu();
+
         chrome.contextMenus.create({ id: 'separator-1', type: 'separator', contexts: ['page'] });
+
         await this._createSavedOffersMenu();
 
         this._initializeClickHandler();
     }
 
     async _createSavedOffersMenu() {
-        chrome.contextMenus.create({ id: MenuManager.CONFIG.SAVED_OFFERS_PARENT_ID, title: 'Сохраненные предложения', contexts: ['page'] });
+        // --- Пункт меню "Сохраненные предложения" закомментирован ---
+        // chrome.contextMenus.create({ 
+        //     id: MenuManager.CONFIG.SAVED_OFFERS_PARENT_ID, 
+        //     title: 'Сохраненные предложения', 
+        //     contexts: ['page'] 
+        // });
+
         const { savedOffers = {} } = await chrome.storage.local.get('savedOffers');
+
+        // --- Закомментирован весь блок создания дочерних элементов ---
+        /*
         if (Object.keys(savedOffers).length === 0) {
             chrome.contextMenus.create({
                 id: MenuManager.CONFIG.NO_SAVED_OFFERS_ID,
@@ -56,6 +67,8 @@ class MenuManager {
                 });
             }
         }
+        */
+
         await this.logger.info(`Загружено ${Object.keys(savedOffers).length} сохраненных предложений в меню`);
     }
 
@@ -99,17 +112,21 @@ class MenuManager {
                 });
             }
         }
+
         await this.logger.info(`Загружено ${components.length} сохраненных компонентов в меню`);
     }
 
     async addSavedOfferItem(offerId, offerName) {
         try { await chrome.contextMenus.remove(MenuManager.CONFIG.NO_SAVED_OFFERS_ID); } catch { }
-        chrome.contextMenus.create({
-            id: offerId,
-            parentId: MenuManager.CONFIG.SAVED_OFFERS_PARENT_ID,
-            title: offerName,
-            contexts: ['page']
-        });
+
+        // --- Пункт добавления отдельного предложения оставляем на будущее ---
+        // chrome.contextMenus.create({
+        //     id: offerId,
+        //     parentId: MenuManager.CONFIG.SAVED_OFFERS_PARENT_ID,
+        //     title: offerName,
+        //     contexts: ['page']
+        // });
+
         await this.logger.info(`Пункт меню "${offerName}" добавлен.`);
     }
 
@@ -137,6 +154,7 @@ class MenuManager {
                                 chrome.tabs.create({ url: chrome.runtime.getURL('preview-offer.html') });
                             }
                         });
+
                         await this.logger.info('Открыт файл preview-offer.html с компонентами');
                         break;
 

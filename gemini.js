@@ -75,10 +75,10 @@ async function loadPriceOfferPrompt() {
         return null;
     };
 
-    let promptText = await tryLoad(`instructions/${locale}/component_recognizer.txt`);
+    let promptText = await tryLoad(`instructions/${locale}/price_offer_prompt.txt`);
     if (!promptText) {
         logger.info('Загрузка промпта на английском языке как резервный вариант');
-        promptText = await tryLoad(`instructions/en/component_recognizer.txt`);
+        promptText = await tryLoad(`instructions/en/price_offer_prompt.txt`);
     }
 
     if (!promptText) {

@@ -92,6 +92,7 @@ async function saveOffer(tabId, result) {
     }
 }
 
+
 /**
  * Обработка предложения с помощью Gemini API
  * 
@@ -101,10 +102,12 @@ async function saveOffer(tabId, result) {
  */
 async function processOfferWithGemini(componentsData, tabId) {
     try {
-        const { geminiApiKey, geminiModel } = await chrome.storage.sync.get(['geminiApiKey', 'geminiModel']);
+        // Получаем ключ и модель из синхронизированного хранилища
+        const { geminiApiKey, geminiModel = 'gemini-2.5-flash' } = await chrome.storage.sync.get(['geminiApiKey', 'geminiModel']);
 
+        // Если API ключ отсутствует — открываем окно настроек и прекращаем выполнение
         if (!geminiApiKey) {
-            logger.warn('API ключ не установлен, открытие страницы настроек');
+            logger.warn('API ключ отсутствует, открываем страницу настроек');
             chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
             return;
         }
@@ -285,13 +288,13 @@ self.checkPreviewTabs = async function () {
     const previewUrl = chrome.runtime.getURL('preview-offer.html');
     const tabs = await chrome.tabs.query({ url: previewUrl });
 
-    console.log('=== ПРОВЕРКА ВКЛАДОК PREVIEW-OFFER ===');
-    console.log(`Найдено вкладок: ${tabs.length}`);
+    logger.debug('=== ПРОВЕРКА ВКЛАДОК PREVIEW-OFFER ===');
+    logger.debug(`Найдено вкладок: ${tabs.length}`);
 
     if (tabs.length > 0) {
-        console.log('Список вкладок:');
+        logger.debug('Список вкладок:');
         tabs.forEach((tab, index) => {
-            console.log(`  ${index + 1}. Tab ID: ${tab.id}, Window ID: ${tab.windowId}, Active: ${tab.active}`);
+            logger.debug(`  ${index + 1}. Tab ID: ${tab.id}, Window ID: ${tab.windowId}, Active: ${tab.active}`);
         });
     }
 
@@ -302,8 +305,8 @@ self.checkPreviewTabs = async function () {
  * Проверка состояния
  */
 self.checkState = function () {
-    console.log('=== ПРОВЕРКА СОСТОЯНИЯ ===');
-    console.log('MenuClickState:', {
+    logger.debug('=== ПРОВЕРКА СОСТОЯНИЯ ===');
+    logger.debug('MenuClickState:', {
         processing: MenuClickState.processing,
         lastClickTime: MenuClickState.lastClickTime,
         lastMenuItemId: MenuClickState.lastMenuItemId,
@@ -311,12 +314,12 @@ self.checkState = function () {
     });
 
     if (typeof previewTabMutex !== 'undefined') {
-        console.log('previewTabMutex:', {
+        logger.debug('previewTabMutex:', {
             locked: previewTabMutex.locked,
             waitingCount: previewTabMutex.waiting.length
         });
     } else {
-        console.log('previewTabMutex: НЕ ОПРЕДЕЛЕН (проверьте handlers.js)');
+        logger.debug('previewTabMutex: НЕ ОПРЕДЕЛЕН (проверьте handlers.js)');
     }
 };
 
@@ -327,32 +330,32 @@ self.closeAllPreviewTabs = async function () {
     const tabs = await self.checkPreviewTabs();
 
     if (tabs.length <= 1) {
-        console.log('Дублирующих вкладок не найдено');
+        logger.debug('Дублирующих вкладок не найдено');
         return;
     }
 
-    console.log(`Закрытие ${tabs.length - 1} дублирующих вкладок...`);
+    logger.debug(`Закрытие ${tabs.length - 1} дублирующих вкладок...`);
 
     for (let i = 1; i < tabs.length; i++) {
         await chrome.tabs.remove(tabs[i].id);
-        console.log(`Закрыта вкладка ${tabs[i].id}`);
+        logger.debug(`Закрыта вкладка ${tabs[i].id}`);
     }
 
-    console.log('Все дублирующие вкладки закрыты');
+    logger.debug('Все дублирующие вкладки закрыты');
 };
 
 /**
  * Полная диагностика
  */
 self.fullDiagnostic = async function () {
-    console.log('\n╔════════════════════════════════════════════╗');
-    console.log('║   ПОЛНАЯ ДИАГНОСТИКА РАСШИРЕНИЯ           ║');
-    console.log('╚════════════════════════════════════════════╝\n');
+    logger.debug('\n╔════════════════════════════════════════════╗');
+    logger.debug('║   ПОЛНАЯ ДИАГНОСТИКА РАСШИРЕНИЯ           ║');
+    logger.debug('╚════════════════════════════════════════════╝\n');
 
     await self.checkPreviewTabs();
-    console.log('');
+    logger.debug('');
     self.checkState();
-    console.log('');
+    logger.debug('');
 
     const storage = await chrome.storage.local.get([
         'addedComponents',
@@ -360,51 +363,51 @@ self.fullDiagnostic = async function () {
         'previewOfferTabId'
     ]);
 
-    console.log('=== ПРОВЕРКА STORAGE ===');
-    console.log('addedComponents:', storage.addedComponents?.length || 0);
-    console.log('componentsForOffer:', storage.componentsForOffer?.length || 0);
-    console.log('previewOfferTabId:', storage.previewOfferTabId);
+    logger.debug('=== ПРОВЕРКА STORAGE ===');
+    logger.debug('addedComponents:', storage.addedComponents?.length || 0);
+    logger.debug('componentsForOffer:', storage.componentsForOffer?.length || 0);
+    logger.debug('previewOfferTabId:', storage.previewOfferTabId);
 
-    console.log('\n╔════════════════════════════════════════════╗');
-    console.log('║   ДИАГНОСТИКА ЗАВЕРШЕНА                   ║');
-    console.log('╚════════════════════════════════════════════╝\n');
+    logger.debug('\n╔════════════════════════════════════════════╗');
+    logger.debug('║   ДИАГНОСТИКА ЗАВЕРШЕНА                   ║');
+    logger.debug('╚════════════════════════════════════════════╝\n');
 };
 
 /**
  * Сброс всех флагов
  */
 self.resetAllFlags = function () {
-    console.log('Принудительный сброс всех флагов...');
+    logger.debug('Принудительный сброс всех флагов...');
 
     MenuClickState.processing = false;
     MenuClickState.lastClickTime = 0;
     MenuClickState.lastMenuItemId = null;
-    console.log('✓ MenuClickState сброшен');
+    logger.debug('✓ MenuClickState сброшен');
 
     if (typeof previewTabMutex !== 'undefined') {
         previewTabMutex.locked = false;
         previewTabMutex.waiting = [];
-        console.log('✓ previewTabMutex сброшен');
+        logger.debug('✓ previewTabMutex сброшен');
     } else {
-        console.log('⚠ previewTabMutex не определен');
+        logger.debug('⚠ previewTabMutex не определен');
     }
 
-    console.log('Все флаги сброшены');
+    logger.debug('Все флаги сброшены');
 };
 
 // Вывод доступных команд с задержкой, чтобы они были видны после инициализации
 setTimeout(() => {
-    console.log('\n╔════════════════════════════════════════════╗');
-    console.log('║   ОТЛАДОЧНЫЕ КОМАНДЫ ДОСТУПНЫ             ║');
-    console.log('╚════════════════════════════════════════════╝');
-    console.log('');
-    console.log('Доступные команды:');
-    console.log('  - fullDiagnostic()      : Полная диагностика');
-    console.log('  - checkPreviewTabs()    : Проверка вкладок preview-offer');
-    console.log('  - checkState()          : Проверка состояния');
-    console.log('  - closeAllPreviewTabs() : Закрыть все дублирующие вкладки');
-    console.log('  - resetAllFlags()       : Сброс всех флагов');
-    console.log('');
-    console.log('Тест: Попробуйте выполнить fullDiagnostic()');
-    console.log('');
+    logger.debug('\n╔════════════════════════════════════════════╗');
+    logger.debug('║   ОТЛАДОЧНЫЕ КОМАНДЫ ДОСТУПНЫ             ║');
+    logger.debug('╚════════════════════════════════════════════╝');
+    logger.debug('');
+    logger.debug('Доступные команды:');
+    logger.debug('  - fullDiagnostic()      : Полная диагностика');
+    logger.debug('  - checkPreviewTabs()    : Проверка вкладок preview-offer');
+    logger.debug('  - checkState()          : Проверка состояния');
+    logger.debug('  - closeAllPreviewTabs() : Закрыть все дублирующие вкладки');
+    logger.debug('  - resetAllFlags()       : Сброс всех флагов');
+    logger.debug('');
+    logger.debug('Тест: Попробуйте выполнить fullDiagnostic()');
+    logger.debug('');
 }, 100);
