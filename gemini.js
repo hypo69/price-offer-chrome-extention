@@ -11,6 +11,11 @@
 const GeminiAPI = {};
 
 /**
+ * Максимальная длина текста для отправки в промпт
+ */
+const MAX_PROMPT_LENGTH = 10000;
+
+/**
  * Загрузка промпта для текущей локали
  * Функция определяет язык интерфейса и загружает соответствующий файл инструкций
  * 
@@ -58,15 +63,25 @@ async function loadPriceOfferPrompt() {
     }
 
     return promptText;
-};
+}
 
 /**
  * Отправка запроса к Gemini API
+ * Функция выполняет HTTP-запрос к API и обрабатывает ответ
+ * 
+ * Args:
+ *     fullPrompt (string): Полный текст промпта для модели
+ *     apiKey (string): API ключ для аутентификации
+ *     model (string): Название модели Gemini
+ * 
+ * Returns:
+ *     Promise<string>: Текст ответа от модели
+ * 
+ * Raises:
+ *     Error: При ошибке API или сетевой ошибке
  */
 async function _sendRequestToGemini(fullPrompt, apiKey, model) {
     const url = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-    await logger.info('Отправка запроса к Gemini API', { model: model, promptLength: fullPrompt.length });
 
     try {
         const response = await fetch(url, {
@@ -110,6 +125,18 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
 
 /**
  * Формирование полного предложения цены
+ * Функция загружает промпт, формирует запрос и отправляет его в Gemini
+ * 
+ * Args:
+ *     pageText (string): Текст данных компонентов для обработки
+ *     apiKey (string): API ключ Gemini
+ *     model (string): Название модели Gemini
+ * 
+ * Returns:
+ *     Promise<string>: Сформированное предложение цены от модели
+ * 
+ * Raises:
+ *     Error: При ошибке загрузки промпта или API запроса
  */
 GeminiAPI.getFullPriceOffer = async (pageText, apiKey, model) => {
     await logger.info('Начало формирования предложения цены', { model, textLength: pageText.length });
@@ -120,17 +147,28 @@ GeminiAPI.getFullPriceOffer = async (pageText, apiKey, model) => {
         throw new Error('Не удалось загрузить инструкции для модели');
     }
 
-    const truncatedText = pageText.substring(0, 10000);
+    const truncatedText = pageText.substring(0, MAX_PROMPT_LENGTH);
     const fullPrompt = `${instructions}\n\n${truncatedText}`;
 
-    // --- Логируем полный промпт через твой Logger ---
     await logger.info('Полный промпт отправляется в Gemini', { fullPrompt });
 
     return await _sendRequestToGemini(fullPrompt, apiKey, model);
 };
 
 /**
- * Получение ответа модели с логированием и парсингом JSON
+ * Получение ответа модели с парсингом JSON
+ * Функция отправляет запрос и парсит ответ как JSON
+ * 
+ * Args:
+ *     pageText (string): Текст данных для обработки
+ *     apiKey (string): API ключ Gemini
+ *     model (string): Название модели Gemini
+ * 
+ * Returns:
+ *     Promise<Object>: Распарсенный JSON-ответ модели
+ * 
+ * Raises:
+ *     Error: При ошибке загрузки промпта, API запроса или парсинга JSON
  */
 GeminiAPI.getModelResponseJSON = async (pageText, apiKey, model) => {
     await logger.info('Запрос полного ответа от модели (JSON)', { model, textLength: pageText.length });
@@ -141,14 +179,13 @@ GeminiAPI.getModelResponseJSON = async (pageText, apiKey, model) => {
         throw new Error('Не удалось загрузить инструкции для модели');
     }
 
-    const truncatedText = pageText.substring(0, 10000);
+    const truncatedText = pageText.substring(0, MAX_PROMPT_LENGTH);
     const fullPrompt = `${instructions}\n\n${truncatedText}`;
 
     await logger.info('Промпт отправляется для получения JSON', { fullPrompt });
 
     const modelResponse = await _sendRequestToGemini(fullPrompt, apiKey, model);
 
-    // --- Логируем текст ответа ---
     await logger.info('Ответ модели получен', { response: modelResponse });
 
     let parsedJSON = null;

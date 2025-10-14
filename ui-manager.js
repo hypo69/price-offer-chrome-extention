@@ -1,4 +1,6 @@
 // ui-manager.js
+// \file ui-manager.js
+// -*- coding: utf-8 -*-
 
 /**
  * Модуль управления UI-элементами расширения
@@ -7,6 +9,14 @@
  */
 
 class UIManager {
+    /**
+     * Отображение индикатора загрузки
+     * Функция создает визуальный индикатор на странице
+     * 
+     * Args:
+     *     tabId (number): ID вкладки
+     *     message (string): Текст сообщения для отображения
+     */
     static showIndicator(tabId, message) {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -46,6 +56,13 @@ class UIManager {
         });
     }
 
+    /**
+     * Скрытие индикатора загрузки
+     * Функция удаляет индикатор со страницы
+     * 
+     * Args:
+     *     tabId (number): ID вкладки
+     */
     static hideIndicator(tabId) {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -63,6 +80,16 @@ class UIManager {
         });
     }
 
+    /**
+     * Отображение уведомления с автоскрытием
+     * Функция показывает цветное уведомление на заданное время
+     * 
+     * Args:
+     *     tabId (number): ID вкладки
+     *     message (string): Текст уведомления
+     *     timeout (number): Время отображения в миллисекундах (по умолчанию 4000)
+     *     isError (boolean): Флаг ошибки для изменения цвета (по умолчанию false)
+     */
     static showError(tabId, message, timeout = 4000, isError = false) {
         logger.info('Отображение уведомления', {
             tabId: tabId,
@@ -75,6 +102,15 @@ class UIManager {
         setTimeout(() => this.hideIndicator(tabId), timeout);
     }
 
+    /**
+     * Отображение цветного уведомления
+     * Функция создает уведомление с цветом в зависимости от типа
+     * 
+     * Args:
+     *     tabId (number): ID вкладки
+     *     message (string): Текст уведомления
+     *     isError (boolean): Флаг ошибки для выбора цвета (по умолчанию false)
+     */
     static showNotificationWithColor(tabId, message, isError = false) {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -127,6 +163,14 @@ class UIManager {
         });
     }
 
+    /**
+     * Отображение модального окна
+     * Функция создает модальное окно для отображения результатов
+     * 
+     * Args:
+     *     tabId (number): ID вкладки
+     *     content (string): Содержимое для отображения
+     */
     static showModal(tabId, content) {
         chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -184,6 +228,14 @@ class UIManager {
         });
     }
 
+    /**
+     * Отображение системного уведомления
+     * Функция создает нативное уведомление браузера
+     * 
+     * Args:
+     *     title (string): Заголовок уведомления
+     *     message (string): Текст уведомления
+     */
     static showNotification(title, message) {
         chrome.notifications.create({
             type: 'basic',

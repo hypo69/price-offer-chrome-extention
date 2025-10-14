@@ -14,7 +14,23 @@ const logger = new Logger('__kazarinov_logs__', 100);
 const menuManager = new MenuManager(logger);
 
 /**
+ * Состояние обработчика меню
+ * Хранение информации о последнем клике для debounce
+ */
+const MenuClickState = {
+    lastClickTime: 0,
+    lastMenuItemId: null,
+    processing: false
+};
+
+/**
+ * Конфигурация debounce для кликов по меню
+ */
+const DEBOUNCE_TIME = 500;
+
+/**
  * Отображение результата пользователю
+ * Функция выбирает способ отображения в зависимости от доступности content script
  * 
  * Args:
  *     tabId (number): ID вкладки
@@ -48,6 +64,7 @@ async function showResultToUser(tabId, summary) {
 
 /**
  * Сохранение предложения с пользовательским названием
+ * Функция запрашивает имя предложения и сохраняет его в storage
  * 
  * Args:
  *     tabId (number): ID вкладки
@@ -92,60 +109,9 @@ async function saveOffer(tabId, result) {
     }
 }
 
-
-/**
- * Обработка предложения с помощью Gemini API
- * 
- * Args:
- *     componentsData (Array): Массив данных компонентов
- *     tabId (number): ID вкладки
- */
-async function processOfferWithGemini(componentsData, tabId) {
-    try {
-        // Получаем ключ и модель из синхронизированного хранилища
-        const { geminiApiKey, geminiModel = 'gemini-2.5-flash' } = await chrome.storage.sync.get(['geminiApiKey', 'geminiModel']);
-
-        // Если API ключ отсутствует — открываем окно настроек и прекращаем выполнение
-        if (!geminiApiKey) {
-            logger.warn('API ключ отсутствует, открываем страницу настроек');
-            chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
-            return;
-        }
-
-        const textForPrompt = componentsData
-            .map(c => JSON.stringify(c.data, null, 2))
-            .join('\n\n---\n\n');
-
-        logger.info('Начало обработки предложения из компонентов', {
-            model: geminiModel,
-            componentsCount: componentsData.length,
-            promptLength: textForPrompt.length
-        });
-
-        const result = await GeminiAPI.getFullPriceOffer(textForPrompt, geminiApiKey, geminiModel);
-
-        await chrome.storage.local.set({ lastOffer: result });
-
-        logger.info('Результат успешно получен и сохранен как lastOffer');
-
-        const formattedResult = JSON.stringify(JSON.parse(result), null, 2);
-        await showResultToUser(tabId, formattedResult);
-        await saveOffer(tabId, result);
-
-    } catch (ex) {
-        logger.error('Ошибка при работе с Gemini API', {
-            message: ex.message,
-            details: ex.details || 'Дополнительные детали отсутствуют',
-            stack: ex.stack
-        });
-
-        const errorMsg = `Ошибка Gemini: ${ex.message.substring(0, 100)}`;
-        UIManager.showError(tabId, errorMsg, 4000, true);
-    }
-}
-
 /**
  * Проверка доступности вкладки
+ * Функция определяет, можно ли выполнять операции на данной вкладке
  * 
  * Args:
  *     tab (Object): Объект вкладки Chrome
@@ -164,6 +130,7 @@ function isTabAccessible(tab) {
 
 /**
  * Обработчик установки/обновления расширения
+ * Функция инициализирует контекстное меню при первом запуске
  */
 chrome.runtime.onInstalled.addListener(async () => {
     logger.info('Расширение установлено/обновлено');
@@ -171,21 +138,15 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 /**
- * Состояние обработчика меню
- */
-const MenuClickState = {
-    lastClickTime: 0,
-    lastMenuItemId: null,
-    processing: false
-};
-
-/**
  * Глобальный обработчик кликов по контекстному меню
  * Единственное место обработки всех событий меню
  * Реализован debounce для предотвращения множественных кликов
+ * 
+ * Args:
+ *     info (Object): Информация о клике по меню
+ *     tab (Object): Объект текущей вкладки
  */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-    const DEBOUNCE_TIME = 500; // мс
     const now = Date.now();
     const timeSinceLastClick = now - MenuClickState.lastClickTime;
 
@@ -195,7 +156,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         processing: MenuClickState.processing
     });
 
-    // Debounce: игнорируем быстрые повторные клики на тот же пункт меню
     if (MenuClickState.processing &&
         info.menuItemId === MenuClickState.lastMenuItemId &&
         timeSinceLastClick < DEBOUNCE_TIME) {
@@ -206,7 +166,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         return;
     }
 
-    // Блокировка одновременных обработок
     if (MenuClickState.processing) {
         logger.warn('Блокировка повторного клика - обработка уже выполняется');
         return;
@@ -266,7 +225,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             menuItemId: info.menuItemId
         });
     } finally {
-        // Сброс флага обработки
         setTimeout(() => {
             MenuClickState.processing = false;
             logger.debug('Флаг обработки меню сброшен');
@@ -274,7 +232,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 });
 
-logger.info('Background script инициализирован и готов к работе');
+// logger.info('Background script инициализирован и готов к работе');
 
 /**
  * Отладочные функции для диагностики
@@ -283,6 +241,9 @@ logger.info('Background script инициализирован и готов к �
 
 /**
  * Проверка всех открытых вкладок preview-offer.html
+ * 
+ * Returns:
+ *     Promise<Array>: Массив объектов вкладок
  */
 self.checkPreviewTabs = async function () {
     const previewUrl = chrome.runtime.getURL('preview-offer.html');
@@ -302,7 +263,7 @@ self.checkPreviewTabs = async function () {
 };
 
 /**
- * Проверка состояния
+ * Проверка состояния обработчиков
  */
 self.checkState = function () {
     logger.debug('=== ПРОВЕРКА СОСТОЯНИЯ ===');
@@ -345,7 +306,7 @@ self.closeAllPreviewTabs = async function () {
 };
 
 /**
- * Полная диагностика
+ * Полная диагностика расширения
  */
 self.fullDiagnostic = async function () {
     logger.debug('\n╔════════════════════════════════════════════╗');
@@ -360,13 +321,15 @@ self.fullDiagnostic = async function () {
     const storage = await chrome.storage.local.get([
         'addedComponents',
         'componentsForOffer',
-        'previewOfferTabId'
+        'previewOfferTabId',
+        'previewOfferData'
     ]);
 
     logger.debug('=== ПРОВЕРКА STORAGE ===');
     logger.debug('addedComponents:', storage.addedComponents?.length || 0);
     logger.debug('componentsForOffer:', storage.componentsForOffer?.length || 0);
     logger.debug('previewOfferTabId:', storage.previewOfferTabId);
+    logger.debug('previewOfferData:', storage.previewOfferData ? 'присутствует' : 'отсутствует');
 
     logger.debug('\n╔════════════════════════════════════════════╗');
     logger.debug('║   ДИАГНОСТИКА ЗАВЕРШЕНА                   ║');
@@ -374,7 +337,7 @@ self.fullDiagnostic = async function () {
 };
 
 /**
- * Сброс всех флагов
+ * Сброс всех флагов состояния
  */
 self.resetAllFlags = function () {
     logger.debug('Принудительный сброс всех флагов...');
@@ -395,7 +358,6 @@ self.resetAllFlags = function () {
     logger.debug('Все флаги сброшены');
 };
 
-// Вывод доступных команд с задержкой, чтобы они были видны после инициализации
 setTimeout(() => {
     logger.debug('\n╔════════════════════════════════════════════╗');
     logger.debug('║   ОТЛАДОЧНЫЕ КОМАНДЫ ДОСТУПНЫ             ║');

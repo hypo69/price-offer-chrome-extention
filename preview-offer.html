@@ -1,18 +1,84 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Preview Offer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Предложение цены</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .component { padding: 10px; border: 1px solid #ccc; margin-bottom: 5px; border-radius: 4px; }
-        .component h3 { margin: 0 0 5px 0; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px 20px;
+            background-color: #ffffff;
+            color: #202124;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #202124;
+            font-size: 28px;
+            margin-bottom: 30px;
+            font-weight: 500;
+        }
+
+        #componentsContainer {
+            background-color: #ffffff;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: #5f6368;
+            font-size: 16px;
+        }
+
+            .loading::before {
+                content: '';
+                width: 20px;
+                height: 20px;
+                border: 3px solid #e8eaed;
+                border-top-color: #4285f4;
+                border-radius: 50%;
+                margin-right: 12px;
+                animation: spin 1s linear infinite;
+            }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .error {
+            background-color: #fce8e6;
+            border-left: 4px solid #db4437;
+            padding: 16px;
+            border-radius: 4px;
+            color: #db4437;
+            font-size: 14px;
+        }
+
+        .success {
+            background-color: #e6f4ea;
+            border-left: 4px solid #0f9d58;
+            padding: 16px;
+            border-radius: 4px;
+            color: #0f9d58;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
-    <h1>Сформированное предложение</h1>
-    <div id="componentsContainer"></div>
+    <h1>Предложение цены</h1>
+    <div id="componentsContainer" class="loading">Загрузка данных...</div>
 
     <script src="preview-offer.js"></script>
 </body>
