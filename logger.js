@@ -45,13 +45,13 @@ class Logger {
                 console.info(`[INFO] [${timestamp}] ${message}`, extraDetails);
                 break;
             case 'warn':
-                console.warn(`[WARN] [${timestamp}] ${message}`, extraDetails);
+                console.info(`[WARN] [${timestamp}] ${message}`, extraDetails);
                 break;
             case 'error':
-                console.error(`[ERROR] [${timestamp}] ${message}`, extraDetails);
+                console.info(`[ERROR] [${timestamp}] ${message}`, extraDetails);
                 break;
             case 'debug':
-                console.debug(`[DEBUG] [${timestamp}] ${message}`, extraDetails);
+                console.info(`[DEBUG] [${timestamp}] ${message}`, extraDetails);
                 break;
             default:
                 console.log(`[LOG] [${timestamp}] ${message}`, extraDetails);

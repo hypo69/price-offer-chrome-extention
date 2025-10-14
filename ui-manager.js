@@ -7,42 +7,12 @@
  */
 
 class UIManager {
-    /**
-     * Внутренний логгер для UI-операций
-     */
-    static _logger = null;
-
-    /**
-     * Получение экземпляра логгера
-     * 
-     * Returns:
-     *     Logger: Экземпляр логгера
-     */
-    static _getLogger() {
-        if (!UIManager._logger) {
-            UIManager._logger = new Logger('__kazarinov_logs__', 100);
-        }
-        return UIManager._logger;
-    }
-
-    /**
-     * Отображение индикатора загрузки на странице
-     * Функция создает визуальный индикатор в правом верхнем углу страницы
-     * 
-     * Args:
-     *     tabId (number): ID вкладки
-     *     message (string): Текст сообщения для отображения
-     */
     static showIndicator(tabId, message) {
-        const logger = UIManager._getLogger();
-
         chrome.scripting.executeScript({
             target: { tabId: tabId },
             func: (msg) => {
                 let el = document.getElementById('__gemini_indicator__');
-                if (el) {
-                    el.remove();
-                }
+                if (el) el.remove();
 
                 el = document.createElement('div');
                 el.id = '__gemini_indicator__';
@@ -72,29 +42,16 @@ class UIManager {
                     error: chrome.runtime.lastError.message,
                     tabId: tabId
                 });
-            } else {
-                await logger.debug('Индикатор отображен', { tabId: tabId, message: message });
             }
         });
     }
 
-    /**
-     * Скрытие индикатора загрузки
-     * Функция удаляет индикатор со страницы
-     * 
-     * Args:
-     *     tabId (number): ID вкладки
-     */
     static hideIndicator(tabId) {
-        const logger = UIManager._getLogger();
-
         chrome.scripting.executeScript({
             target: { tabId: tabId },
             func: () => {
                 const el = document.getElementById('__gemini_indicator__');
-                if (el) {
-                    el.remove();
-                }
+                if (el) el.remove();
             }
         }, async () => {
             if (chrome.runtime.lastError) {
@@ -102,25 +59,11 @@ class UIManager {
                     error: chrome.runtime.lastError.message,
                     tabId: tabId
                 });
-            } else {
-                await logger.debug('Индикатор скрыт', { tabId: tabId });
             }
         });
     }
 
-    /**
-     * Отображение сообщения с автоматическим скрытием
-     * Функция показывает уведомление с цветом в зависимости от типа сообщения
-     * 
-     * Args:
-     *     tabId (number): ID вкладки
-     *     message (string): Текст сообщения
-     *     timeout (number): Время отображения в миллисекундах (по умолчанию 4000)
-     *     isError (boolean): Флаг ошибки для выбора цвета (по умолчанию false)
-     */
     static showError(tabId, message, timeout = 4000, isError = false) {
-        const logger = UIManager._getLogger();
-
         logger.info('Отображение уведомления', {
             tabId: tabId,
             message: message,
@@ -132,31 +75,16 @@ class UIManager {
         setTimeout(() => this.hideIndicator(tabId), timeout);
     }
 
-    /**
-     * Отображение цветного уведомления на странице
-     * Функция создает уведомление с цветом в зависимости от типа
-     * 
-     * Args:
-     *     tabId (number): ID вкладки
-     *     message (string): Текст сообщения
-     *     isError (boolean): true для красного (ошибка), false для голубого (инфо)
-     */
     static showNotificationWithColor(tabId, message, isError = false) {
-        const logger = UIManager._getLogger();
-
         chrome.scripting.executeScript({
             target: { tabId: tabId },
             func: (msg, isErr) => {
                 let el = document.getElementById('__gemini_indicator__');
-                if (el) {
-                    el.remove();
-                }
+                if (el) el.remove();
 
                 el = document.createElement('div');
                 el.id = '__gemini_indicator__';
-
                 const backgroundColor = isErr ? '#db4437' : '#4285f4';
-
                 el.style.cssText = `
                     position: fixed;
                     top: 20px;
@@ -174,7 +102,6 @@ class UIManager {
                     pointer-events: none;
                     animation: slideIn 0.3s ease-out;
                 `;
-
                 const style = document.createElement('style');
                 style.textContent = `
                     @keyframes slideIn {
@@ -186,7 +113,6 @@ class UIManager {
                     style.setAttribute('data-gemini-animations', 'true');
                     document.head.appendChild(style);
                 }
-
                 el.textContent = msg;
                 document.body.appendChild(el);
             },
@@ -197,34 +123,16 @@ class UIManager {
                     error: chrome.runtime.lastError.message,
                     tabId: tabId
                 });
-            } else {
-                await logger.debug('Цветное уведомление отображено', {
-                    tabId: tabId,
-                    message: message,
-                    isError: isError
-                });
             }
         });
     }
 
-    /**
-     * Отображение модального окна с контентом
-     * Функция создает полноэкранное модальное окно с содержимым
-     * 
-     * Args:
-     *     tabId (number): ID вкладки
-     *     content (string): Контент для отображения в модальном окне
-     */
     static showModal(tabId, content) {
-        const logger = UIManager._getLogger();
-
         chrome.scripting.executeScript({
             target: { tabId: tabId },
             func: (text) => {
                 const old = document.getElementById('__gemini_modal_fallback__');
-                if (old) {
-                    old.remove();
-                }
+                if (old) old.remove();
 
                 const overlay = document.createElement('div');
                 overlay.id = '__gemini_modal_fallback__';
@@ -260,22 +168,10 @@ class UIManager {
                 document.body.appendChild(overlay);
 
                 const close = () => {
-                    if (overlay.parentNode) {
-                        overlay.parentNode.removeChild(overlay);
-                    }
+                    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
                 };
-
-                overlay.onclick = (e) => {
-                    if (e.target === overlay) {
-                        close();
-                    }
-                };
-
-                document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        close();
-                    }
-                });
+                overlay.onclick = (e) => { if (e.target === overlay) close(); };
+                document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
             },
             args: [content]
         }, async () => {
@@ -284,26 +180,11 @@ class UIManager {
                     error: chrome.runtime.lastError.message,
                     tabId: tabId
                 });
-            } else {
-                await logger.info('Модальное окно отображено', {
-                    tabId: tabId,
-                    contentLength: content.length
-                });
             }
         });
     }
 
-    /**
-     * Отображение системного уведомления Chrome
-     * Функция создает нативное уведомление операционной системы
-     * 
-     * Args:
-     *     title (string): Заголовок уведомления
-     *     message (string): Текст уведомления
-     */
     static showNotification(title, message) {
-        const logger = UIManager._getLogger();
-
         chrome.notifications.create({
             type: 'basic',
             iconUrl: 'icons/icon48.png',
@@ -313,11 +194,6 @@ class UIManager {
             if (chrome.runtime.lastError) {
                 await logger.error('Ошибка создания системного уведомления', {
                     error: chrome.runtime.lastError.message,
-                    title: title
-                });
-            } else {
-                await logger.debug('Системное уведомление создано', {
-                    notificationId: notificationId,
                     title: title
                 });
             }

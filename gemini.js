@@ -11,24 +11,6 @@
 const GeminiAPI = {};
 
 /**
- * Внутренний логгер для модуля Gemini
- */
-let _logger = null;
-
-/**
- * Получение экземпляра логгера для модуля
- * 
- * Returns:
- *     Logger: Экземпляр логгера
- */
-function _getLogger() {
-    if (!_logger) {
-        _logger = new Logger('__kazarinov_logs__', 100);
-    }
-    return _logger;
-}
-
-/**
  * Загрузка промпта для текущей локали
  * Функция определяет язык интерфейса и загружает соответствующий файл инструкций
  * 
@@ -36,7 +18,6 @@ function _getLogger() {
  *     Promise<string|null>: Текст промпта или null при ошибке
  */
 async function loadPriceOfferPrompt() {
-    const logger = _getLogger();
     let locale = 'en';
 
     try {
@@ -46,86 +27,58 @@ async function loadPriceOfferPrompt() {
         } else if (currentLocale.startsWith('he')) {
             locale = 'he';
         }
-        logger.debug(`Определена локаль: ${locale}`);
+        await logger.debug(`Определена локаль: ${locale}`);
     } catch (ex) {
-        logger.warn('Ошибка определения локали, используется en по умолчанию', { error: ex.message });
+        await logger.warn('Ошибка определения локали, используется en по умолчанию', { error: ex.message });
     }
 
-    /**
-     * Попытка загрузки файла промпта
-     * 
-     * Args:
-     *     path (string): Путь к файлу
-     * 
-     * Returns:
-     *     Promise<string|null>: Содержимое файла или null
-     */
     const tryLoad = async (path) => {
         try {
             const url = chrome.runtime.getURL(path);
             const res = await fetch(url);
             if (res.ok) {
-                logger.debug(`Успешно загружен промпт: ${path}`);
+                await logger.debug(`Успешно загружен промпт: ${path}`);
                 return await res.text();
             }
-            logger.warn(`Не удалось загрузить промпт: ${path} (статус: ${res.status})`);
+            await logger.warn(`Не удалось загрузить промпт: ${path} (статус: ${res.status})`);
         } catch (ex) {
-            logger.warn(`Ошибка загрузки промпта: ${path}`, { error: ex.message });
+            await logger.warn(`Ошибка загрузки промпта: ${path}`, { error: ex.message });
         }
         return null;
     };
 
     let promptText = await tryLoad(`instructions/${locale}/price_offer_prompt.txt`);
     if (!promptText) {
-        logger.info('Загрузка промпта на английском языке как резервный вариант');
+        await logger.info('Загрузка промпта на английском языке как резервный вариант');
         promptText = await tryLoad(`instructions/en/price_offer_prompt.txt`);
     }
 
     if (!promptText) {
-        logger.error('Не удалось загрузить промпт ни для одной локали');
+        await logger.error('Не удалось загрузить промпт ни для одной локали');
     }
 
     return promptText;
-}
+};
 
 /**
  * Отправка запроса к Gemini API
- * Функция выполняет HTTP-запрос к API и обрабатывает ответ
- * 
- * Args:
- *     fullPrompt (string): Полный текст промпта для отправки
- *     apiKey (string): API ключ для аутентификации
- *     model (string): Название модели Gemini
- * 
- * Returns:
- *     Promise<string>: Текстовый результат от модели
- * 
- * Raises:
- *     Error: При ошибках API или пустом ответе
  */
 async function _sendRequestToGemini(fullPrompt, apiKey, model) {
-    const logger = _getLogger();
     const url = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    logger.info('Отправка запроса к Gemini API', { model: model, promptLength: fullPrompt.length });
+    await logger.info('Отправка запроса к Gemini API', { model: model, promptLength: fullPrompt.length });
 
     try {
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: fullPrompt }] }]
-            })
+            body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
         });
 
         const data = await response.json();
 
         if (data.error) {
-            logger.error('Ошибка Gemini API', {
-                code: data.error.code,
-                message: data.error.message,
-                status: data.error.status
-            });
+            await logger.error('Ошибка Gemini API', { code: data.error.code, message: data.error.message, status: data.error.status });
             const error = new Error(data.error.message || 'Неизвестная ошибка Gemini API');
             error.details = data.error;
             throw error;
@@ -133,10 +86,7 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
 
         if (!data.candidates || data.candidates.length === 0) {
             const blockReason = data.promptFeedback?.blockReason || 'Неизвестная причина';
-            logger.error('Ответ Gemini заблокирован или пуст', {
-                blockReason: blockReason,
-                promptFeedback: data.promptFeedback
-            });
+            await logger.error('Ответ Gemini заблокирован или пуст', { blockReason, promptFeedback: data.promptFeedback });
             const error = new Error(`Ответ от модели заблокирован. Причина: ${blockReason}`);
             error.details = data.promptFeedback || { message: 'Кандидаты отсутствуют в ответе' };
             throw error;
@@ -144,65 +94,71 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
 
         const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!resultText) {
-            logger.error('Пустой текст в ответе модели', { candidates: data.candidates });
+            await logger.error('Пустой текст в ответе модели', { candidates: data.candidates });
             throw new Error('Пустой ответ от модели, хотя кандидаты присутствуют');
         }
 
-        logger.info('Успешно получен ответ от Gemini API', {
-            responseLength: resultText.length,
-            finishReason: data.candidates[0]?.finishReason
-        });
+        await logger.info('Успешно получен ответ от Gemini API', { responseLength: resultText.length, finishReason: data.candidates[0]?.finishReason });
 
         return resultText;
     } catch (ex) {
-        if (ex.details) {
-            throw ex;
-        }
-        logger.error('Ошибка сетевого запроса к Gemini API', {
-            error: ex.message,
-            stack: ex.stack
-        });
+        if (ex.details) throw ex;
+        await logger.error('Ошибка сетевого запроса к Gemini API', { error: ex.message, stack: ex.stack });
         throw new Error(`Ошибка соединения с Gemini API: ${ex.message}`);
     }
 }
 
 /**
  * Формирование полного предложения цены
- * Главная функция модуля: загружает инструкции, формирует промпт
- * и отправляет запрос к Gemini API
- * 
- * Args:
- *     pageText (string): Текст со страницы для анализа
- *     apiKey (string): API ключ Gemini
- *     model (string): Название модели Gemini
- * 
- * Returns:
- *     Promise<string>: Готовый JSON в виде строки
- * 
- * Raises:
- *     Error: При ошибках загрузки инструкций или работы с API
  */
 GeminiAPI.getFullPriceOffer = async (pageText, apiKey, model) => {
-    const logger = _getLogger();
-
-    logger.info('Начало формирования предложения цены', {
-        model: model,
-        textLength: pageText.length
-    });
+    await logger.info('Начало формирования предложения цены', { model, textLength: pageText.length });
 
     const instructions = await loadPriceOfferPrompt();
     if (!instructions) {
-        logger.error('Не удалось загрузить инструкции для модели');
+        await logger.error('Не удалось загрузить инструкции для модели');
         throw new Error('Не удалось загрузить инструкции для модели');
     }
 
     const truncatedText = pageText.substring(0, 10000);
     const fullPrompt = `${instructions}\n\n${truncatedText}`;
 
-    logger.debug('Промпт сформирован', {
-        promptLength: fullPrompt.length,
-        truncated: pageText.length > 10000
-    });
+    // --- Логируем полный промпт через твой Logger ---
+    await logger.info('Полный промпт отправляется в Gemini', { fullPrompt });
 
     return await _sendRequestToGemini(fullPrompt, apiKey, model);
+};
+
+/**
+ * Получение ответа модели с логированием и парсингом JSON
+ */
+GeminiAPI.getModelResponseJSON = async (pageText, apiKey, model) => {
+    await logger.info('Запрос полного ответа от модели (JSON)', { model, textLength: pageText.length });
+
+    const instructions = await loadPriceOfferPrompt();
+    if (!instructions) {
+        await logger.error('Не удалось загрузить инструкции для модели');
+        throw new Error('Не удалось загрузить инструкции для модели');
+    }
+
+    const truncatedText = pageText.substring(0, 10000);
+    const fullPrompt = `${instructions}\n\n${truncatedText}`;
+
+    await logger.info('Промпт отправляется для получения JSON', { fullPrompt });
+
+    const modelResponse = await _sendRequestToGemini(fullPrompt, apiKey, model);
+
+    // --- Логируем текст ответа ---
+    await logger.info('Ответ модели получен', { response: modelResponse });
+
+    let parsedJSON = null;
+    try {
+        parsedJSON = JSON.parse(modelResponse);
+        await logger.info('Ответ модели успешно распарсен как JSON', { parsedJSON });
+    } catch (ex) {
+        await logger.error('Ошибка парсинга JSON из ответа модели', { error: ex.message });
+        throw new Error(`Не удалось распарсить ответ модели как JSON: ${ex.message}`);
+    }
+
+    return parsedJSON;
 };
