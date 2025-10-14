@@ -1,13 +1,75 @@
 // handlers.js
-// Все функции используют глобальные logger и menuManager
-// Не импортируем logger и menuManager заново
+// \file handlers.js
+// -*- coding: utf-8 -*-
+
+/**
+ * Модуль обработчиков действий контекстного меню
+ * ==============================================
+ * Содержит функции обработки всех действий пользователя через контекстное меню
+ * Все функции используют глобальные logger и menuManager из background.js
+ */
+
+/**
+ * Класс Mutex для предотвращения race conditions
+ * Обеспечивает эксклюзивный доступ к критическим секциям кода
+ */
+class Mutex {
+    constructor() {
+        this.locked = false;
+        this.waiting = [];
+    }
+
+    /**
+     * Захват мьютекса
+     * Функция блокирует выполнение до получения эксклюзивного доступа
+     * 
+     * Returns:
+     *     Promise<void>: Промис, разрешаемый при получении доступа
+     */
+    async acquire() {
+        if (!this.locked) {
+            this.locked = true;
+            logger.debug('Mutex захвачен');
+            return;
+        }
+
+        logger.debug('Ожидание освобождения Mutex');
+        await new Promise(resolve => {
+            this.waiting.push(resolve);
+        });
+    }
+
+    /**
+     * Освобождение мьютекса
+     * Функция передает доступ следующему ожидающему или освобождает блокировку
+     */
+    release() {
+        if (this.waiting.length > 0) {
+            const resolve = this.waiting.shift();
+            logger.debug('Mutex передан следующему ожидающему');
+            resolve();
+        } else {
+            this.locked = false;
+            logger.debug('Mutex освобожден');
+        }
+    }
+}
+
+/**
+ * Глобальный мьютекс для операций с preview-offer
+ */
+const previewTabMutex = new Mutex();
 
 /**
  * Обработка добавления компонента
+ * Функция извлекает данные со страницы по локаторам и сохраняет компонент
+ * 
+ * Args:
+ *     tab (Object): Объект вкладки Chrome
  */
 async function handleAddComponent(tab) {
     UIManager.showIndicator(tab.id, 'Извлечение данных...');
-    await logger.info('Начало извлечения данных по локаторам', { tabId: tab.id });
+    logger.info('Начало извлечения данных по локаторам', { tabId: tab.id });
 
     try {
         const url = new URL(tab.url);
@@ -22,7 +84,7 @@ async function handleAddComponent(tab) {
 
         const locators = await response.json();
 
-        await logger.debug('Локаторы загружены', {
+        logger.debug('Локаторы загружены', {
             hostname: hostname,
             locatorsCount: Object.keys(locators).length
         });
@@ -43,7 +105,7 @@ async function handleAddComponent(tab) {
                         ? chrome.runtime.lastError.message
                         : 'Данные не найдены';
 
-                    await logger.error('Ошибка извлечения компонента', { error: errorMsg });
+                    logger.error('Ошибка извлечения компонента', { error: errorMsg });
                     UIManager.showError(tab.id, 'Не удалось извлечь данные', 4000, true);
                     return;
                 }
@@ -53,7 +115,7 @@ async function handleAddComponent(tab) {
 
                 if (!componentName || typeof componentName !== 'string' || componentName.trim() === '') {
                     const err_msg = 'Не удалось определить имя компонента.\nПолученные данные: ' + componentName;
-                    await logger.error(err_msg, { data: data });
+                    logger.error(err_msg, { data: data });
                     UIManager.showError(tab.id, err_msg, 4000, true);
                     return;
                 }
@@ -72,7 +134,7 @@ async function handleAddComponent(tab) {
 
                 UIManager.showError(tab.id, `Компонент "${componentName.trim()}" добавлен!`, 2500, false);
 
-                await logger.info('Компонент успешно добавлен', {
+                logger.info('Компонент успешно добавлен', {
                     componentId: newComponent.id,
                     componentName: newComponent.name
                 });
@@ -81,7 +143,7 @@ async function handleAddComponent(tab) {
 
     } catch (ex) {
         UIManager.hideIndicator(tab.id);
-        await logger.error('Ошибка загрузки или обработки локаторов', {
+        logger.error('Ошибка загрузки или обработки локаторов', {
             error: ex.message,
             stack: ex.stack
         });
@@ -91,10 +153,14 @@ async function handleAddComponent(tab) {
 
 /**
  * Обработка удаления компонента
+ * Функция удаляет компонент из storage и обновляет меню
+ * 
+ * Args:
+ *     menuItemId (string): ID пункта меню в формате 'delete-component_xxx'
  */
 async function handleDeleteComponent(menuItemId) {
     const componentId = menuItemId.replace('delete-', '');
-    await logger.info('Запрос на удаление компонента', { componentId: componentId });
+    logger.info('Запрос на удаление компонента', { componentId: componentId });
 
     try {
         const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
@@ -103,10 +169,10 @@ async function handleDeleteComponent(menuItemId) {
         await chrome.storage.local.set({ [MenuManager.STORAGE_KEY]: updatedComponents });
         await menuManager.refreshMenu();
 
-        await logger.info('Компонент удален из хранилища', { componentId: componentId });
+        logger.info('Компонент удален из хранилища', { componentId: componentId });
 
     } catch (ex) {
-        await logger.error('Ошибка удаления компонента', {
+        logger.error('Ошибка удаления компонента', {
             componentId: componentId,
             error: ex.message,
             stack: ex.stack
@@ -116,6 +182,11 @@ async function handleDeleteComponent(menuItemId) {
 
 /**
  * Обработка копирования JSON компонента
+ * Функция копирует данные компонента в буфер обмена в формате JSON
+ * 
+ * Args:
+ *     menuItemId (string): ID компонента
+ *     tab (Object): Объект вкладки Chrome
  */
 async function handleCopyComponent(menuItemId, tab) {
     try {
@@ -123,12 +194,12 @@ async function handleCopyComponent(menuItemId, tab) {
         const foundComponent = components.find(c => c.id === menuItemId);
 
         if (!foundComponent) {
-            await logger.error('Сохраненный компонент не найден', { componentId: menuItemId });
+            logger.error('Сохраненный компонент не найден', { componentId: menuItemId });
             UIManager.showError(tab.id, 'Ошибка: компонент не найден', 4000, true);
             return;
         }
 
-        await logger.info('Копирование JSON компонента', { componentName: foundComponent.name });
+        logger.info('Копирование JSON компонента', { componentName: foundComponent.name });
 
         const componentJson = JSON.stringify(foundComponent.data, null, 2);
 
@@ -141,7 +212,7 @@ async function handleCopyComponent(menuItemId, tab) {
         UIManager.showError(tab.id, `JSON компонента "${foundComponent.name}" скопирован!`, 2500, false);
 
     } catch (ex) {
-        await logger.error('Ошибка копирования компонента', {
+        logger.error('Ошибка копирования компонента', {
             componentId: menuItemId,
             error: ex.message,
             stack: ex.stack
@@ -152,6 +223,11 @@ async function handleCopyComponent(menuItemId, tab) {
 
 /**
  * Обработка загрузки сохраненного предложения
+ * Функция загружает сохраненное предложение и отображает его пользователю
+ * 
+ * Args:
+ *     menuItemId (string): ID предложения
+ *     tab (Object): Объект вкладки Chrome
  */
 async function handleLoadOffer(menuItemId, tab) {
     try {
@@ -159,18 +235,18 @@ async function handleLoadOffer(menuItemId, tab) {
         const savedOffer = savedOffers[menuItemId];
 
         if (!savedOffer) {
-            await logger.error('Сохраненное предложение не найдено', { offerId: menuItemId });
+            logger.error('Сохраненное предложение не найдено', { offerId: menuItemId });
             UIManager.showError(tab.id, 'Ошибка: предложение не найдено', 4000, true);
             return;
         }
 
-        await logger.info('Загрузка сохраненного предложения', { offerName: savedOffer.name });
+        logger.info('Загрузка сохраненного предложения', { offerName: savedOffer.name });
 
         const formattedOffer = JSON.stringify(JSON.parse(savedOffer.data), null, 2);
         await showResultToUser(tab.id, formattedOffer);
 
     } catch (ex) {
-        await logger.error('Ошибка загрузки сохраненного предложения', {
+        logger.error('Ошибка загрузки сохраненного предложения', {
             offerId: menuItemId,
             error: ex.message,
             stack: ex.stack
@@ -180,61 +256,85 @@ async function handleLoadOffer(menuItemId, tab) {
 }
 
 /**
- * Глобальный флаг, чтобы не открывать несколько вкладок preview-offer одновременно
- */
-let isOpeningPreviewTab = false;
-
-/**
  * Обработка формирования предложения из компонентов
+ * Функция проверяет наличие компонентов и открывает страницу предпросмотра
+ * Использует Mutex для предотвращения race conditions
+ * 
+ * Args:
+ *     tab (Object): Объект вкладки Chrome
  */
 async function handleGenerateOffer(tab) {
+    logger.info('Вызов handleGenerateOffer', {
+        tabId: tab.id,
+        mutexLocked: previewTabMutex.locked,
+        waitingCount: previewTabMutex.waiting.length
+    });
+
+    // Захват мьютекса для эксклюзивного доступа
+    await previewTabMutex.acquire();
+
     try {
         const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
 
         if (components.length === 0) {
             UIManager.showError(tab.id, 'Нет сохраненных компонентов для формирования предложения', 4000, true);
-            await logger.warn('Попытка сформировать предложение без компонентов');
+            logger.warn('Попытка сформировать предложение без компонентов');
             return;
         }
 
         await chrome.storage.local.set({ componentsForOffer: components });
-        await logger.info('Открытие страницы предпросмотра предложения', { componentsCount: components.length });
+        logger.info('Сохранены компоненты для предложения', { componentsCount: components.length });
 
-        if (isOpeningPreviewTab) {
-            const existingTabs = await chrome.tabs.query({ url: chrome.runtime.getURL('preview-offer.html') });
-            if (existingTabs.length > 0) {
-                await chrome.tabs.update(existingTabs[0].id, { active: true });
-            }
-            return;
-        }
+        const previewUrl = chrome.runtime.getURL('preview-offer.html');
 
-        isOpeningPreviewTab = true;
+        // Поиск существующих вкладок
+        const existingTabs = await chrome.tabs.query({ url: previewUrl });
 
-        const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL('preview-offer.html') });
-        if (tabs.length > 0) {
-            await chrome.tabs.update(tabs[0].id, { active: true });
+        logger.debug('Результат поиска вкладок', {
+            foundCount: existingTabs.length,
+            tabIds: existingTabs.map(t => t.id)
+        });
+
+        if (existingTabs.length > 0) {
+            // Активация первой найденной вкладки
+            const targetTab = existingTabs[0];
+            logger.info('Активация существующей вкладки preview-offer', {
+                tabId: targetTab.id,
+                windowId: targetTab.windowId
+            });
+
+            await chrome.tabs.update(targetTab.id, { active: true });
+            await chrome.windows.update(targetTab.windowId, { focused: true });
+
+            // Перезагрузка вкладки для обновления данных
+            await chrome.tabs.reload(targetTab.id);
         } else {
+            // Создание новой вкладки
+            logger.info('Создание новой вкладки preview-offer');
             const newTab = await chrome.tabs.create({
-                url: chrome.runtime.getURL('preview-offer.html'),
+                url: previewUrl,
                 active: true
             });
             await chrome.storage.local.set({ previewOfferTabId: newTab.id });
+            logger.info('Создана новая вкладка preview-offer', { tabId: newTab.id });
         }
 
     } catch (ex) {
-        await logger.error('Ошибка открытия страницы предложения', {
+        logger.error('Ошибка открытия страницы предложения', {
             error: ex.message,
             stack: ex.stack
         });
         UIManager.showError(tab.id, 'Ошибка открытия предложения', 4000, true);
     } finally {
-        isOpeningPreviewTab = false;
+        // Освобождение мьютекса
+        previewTabMutex.release();
     }
 }
 
-// Экспортируем функции в глобальный объект, чтобы background.js мог их использовать
+// Экспорт функций в глобальный объект для использования в background.js
 self.handleAddComponent = handleAddComponent;
 self.handleDeleteComponent = handleDeleteComponent;
 self.handleCopyComponent = handleCopyComponent;
 self.handleLoadOffer = handleLoadOffer;
 self.handleGenerateOffer = handleGenerateOffer;
+self.previewTabMutex = previewTabMutex;

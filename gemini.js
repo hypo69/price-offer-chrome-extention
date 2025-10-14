@@ -1,4 +1,6 @@
 // gemini.js
+// \file gemini.js
+// -*- coding: utf-8 -*-
 
 /**
  * Модуль взаимодействия с Gemini API
@@ -10,12 +12,11 @@ const GeminiAPI = {};
 
 /**
  * Внутренний логгер для модуля Gemini
- * Инициализация происходит при первом использовании
  */
 let _logger = null;
 
 /**
- * Инициализация логгера для модуля
+ * Получение экземпляра логгера для модуля
  * 
  * Returns:
  *     Logger: Экземпляр логгера
@@ -29,8 +30,7 @@ function _getLogger() {
 
 /**
  * Загрузка промпта для текущей локали
- * Функция пытается загрузить инструкции на языке интерфейса,
- * при неудаче используется английский язык по умолчанию
+ * Функция определяет язык интерфейса и загружает соответствующий файл инструкций
  * 
  * Returns:
  *     Promise<string|null>: Текст промпта или null при ошибке
@@ -46,9 +46,9 @@ async function loadPriceOfferPrompt() {
         } else if (currentLocale.startsWith('he')) {
             locale = 'he';
         }
-        await logger.debug(`Определена локаль: ${locale}`);
+        logger.debug(`Определена локаль: ${locale}`);
     } catch (ex) {
-        await logger.warn('Ошибка определения локали, используется en по умолчанию', { error: ex.message });
+        logger.warn('Ошибка определения локали, используется en по умолчанию', { error: ex.message });
     }
 
     /**
@@ -65,24 +65,24 @@ async function loadPriceOfferPrompt() {
             const url = chrome.runtime.getURL(path);
             const res = await fetch(url);
             if (res.ok) {
-                await logger.debug(`Успешно загружен промпт: ${path}`);
+                logger.debug(`Успешно загружен промпт: ${path}`);
                 return await res.text();
             }
-            await logger.warn(`Не удалось загрузить промпт: ${path} (статус: ${res.status})`);
+            logger.warn(`Не удалось загрузить промпт: ${path} (статус: ${res.status})`);
         } catch (ex) {
-            await logger.warn(`Ошибка загрузки промпта: ${path}`, { error: ex.message });
+            logger.warn(`Ошибка загрузки промпта: ${path}`, { error: ex.message });
         }
         return null;
     };
 
     let promptText = await tryLoad(`instructions/${locale}/component_recognizer.txt`);
     if (!promptText) {
-        await logger.info('Загрузка промпта на английском языке как резервный вариант');
+        logger.info('Загрузка промпта на английском языке как резервный вариант');
         promptText = await tryLoad(`instructions/en/component_recognizer.txt`);
     }
 
     if (!promptText) {
-        await logger.error('Не удалось загрузить промпт ни для одной локали');
+        logger.error('Не удалось загрузить промпт ни для одной локали');
     }
 
     return promptText;
@@ -107,7 +107,7 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
     const logger = _getLogger();
     const url = `https://generativelanguage.googleapis.com/v1/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    await logger.info('Отправка запроса к Gemini API', { model: model, promptLength: fullPrompt.length });
+    logger.info('Отправка запроса к Gemini API', { model: model, promptLength: fullPrompt.length });
 
     try {
         const response = await fetch(url, {
@@ -121,7 +121,7 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
         const data = await response.json();
 
         if (data.error) {
-            await logger.error('Ошибка Gemini API', {
+            logger.error('Ошибка Gemini API', {
                 code: data.error.code,
                 message: data.error.message,
                 status: data.error.status
@@ -133,7 +133,7 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
 
         if (!data.candidates || data.candidates.length === 0) {
             const blockReason = data.promptFeedback?.blockReason || 'Неизвестная причина';
-            await logger.error('Ответ Gemini заблокирован или пуст', {
+            logger.error('Ответ Gemini заблокирован или пуст', {
                 blockReason: blockReason,
                 promptFeedback: data.promptFeedback
             });
@@ -144,11 +144,11 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
 
         const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!resultText) {
-            await logger.error('Пустой текст в ответе модели', { candidates: data.candidates });
+            logger.error('Пустой текст в ответе модели', { candidates: data.candidates });
             throw new Error('Пустой ответ от модели, хотя кандидаты присутствуют');
         }
 
-        await logger.info('Успешно получен ответ от Gemini API', {
+        logger.info('Успешно получен ответ от Gemini API', {
             responseLength: resultText.length,
             finishReason: data.candidates[0]?.finishReason
         });
@@ -158,7 +158,7 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
         if (ex.details) {
             throw ex;
         }
-        await logger.error('Ошибка сетевого запроса к Gemini API', {
+        logger.error('Ошибка сетевого запроса к Gemini API', {
             error: ex.message,
             stack: ex.stack
         });
@@ -185,21 +185,21 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
 GeminiAPI.getFullPriceOffer = async (pageText, apiKey, model) => {
     const logger = _getLogger();
 
-    await logger.info('Начало формирования предложения цены', {
+    logger.info('Начало формирования предложения цены', {
         model: model,
         textLength: pageText.length
     });
 
     const instructions = await loadPriceOfferPrompt();
     if (!instructions) {
-        await logger.error('Не удалось загрузить инструкции для модели');
+        logger.error('Не удалось загрузить инструкции для модели');
         throw new Error('Не удалось загрузить инструкции для модели');
     }
 
     const truncatedText = pageText.substring(0, 10000);
     const fullPrompt = `${instructions}\n\n${truncatedText}`;
 
-    await logger.debug('Промпт сформирован', {
+    logger.debug('Промпт сформирован', {
         promptLength: fullPrompt.length,
         truncated: pageText.length > 10000
     });
