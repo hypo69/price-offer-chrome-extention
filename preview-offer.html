@@ -4,82 +4,177 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Предложение цены</title>
+    <link rel="stylesheet" href="css/common.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 40px 20px;
-            background-color: #ffffff;
-            color: #202124;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        h1 {
-            color: #202124;
-            font-size: 28px;
-            margin-bottom: 30px;
-            font-weight: 500;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
         }
 
         #componentsContainer {
-            background-color: #ffffff;
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
+        .view-toggle-btn {
+            padding: 8px 16px;
+            background-color: #f1f3f4;
             color: #5f6368;
-            font-size: 16px;
+            border: none;
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
         }
 
-            .loading::before {
-                content: '';
-                width: 20px;
-                height: 20px;
-                border: 3px solid #e8eaed;
-                border-top-color: #4285f4;
-                border-radius: 50%;
-                margin-right: 12px;
-                animation: spin 1s linear infinite;
+            .view-toggle-btn:hover {
+                background-color: #e8eaed;
             }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
+            .view-toggle-btn.active {
+                background-color: #4285f4;
+                color: white;
             }
+
+        /* JSON highlighting */
+        .json-key {
+            color: #0451a5;
+            font-weight: 600;
         }
 
-        .error {
-            background-color: #fce8e6;
-            border-left: 4px solid #db4437;
-            padding: 16px;
-            border-radius: 4px;
-            color: #db4437;
-            font-size: 14px;
+        .json-string {
+            color: #0a8000;
         }
 
-        .success {
-            background-color: #e6f4ea;
-            border-left: 4px solid #0f9d58;
-            padding: 16px;
-            border-radius: 4px;
-            color: #0f9d58;
-            font-size: 14px;
+        .json-number {
+            color: #098658;
         }
+
+        .json-boolean {
+            color: #0000ff;
+        }
+
+        .json-null {
+            color: #808080;
+        }
+
+        .json-bracket {
+            color: #000000;
+            font-weight: bold;
+        }
+
+        .json-colon {
+            color: #000000;
+        }
+
+        .json-comma {
+            color: #000000;
+        }
+
+        .json-array, .json-object {
+            margin: 0;
+        }
+
+        .json-property, .json-item {
+            margin: 2px 0;
+        }
+
+        /* HTML Document Styles */
+        .offer-document {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .offer-title {
+            color: #202124;
+            font-size: 32px;
+            font-weight: 600;
+            margin: 0 0 30px 0;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #4285f4;
+            text-align: left;
+        }
+
+        .offer-description {
+            margin-bottom: 30px;
+        }
+
+            .offer-description p {
+                color: #202124;
+                font-size: 16px;
+                line-height: 1.8;
+                margin: 0;
+                text-align: justify;
+            }
+
+        .field-section {
+            margin-bottom: 25px;
+        }
+
+        .string-value {
+            color: #202124;
+            font-size: 15px;
+            line-height: 1.7;
+            margin: 10px 0;
+            text-align: left;
+        }
+
+        .number-value {
+            color: #098658;
+            font-size: 15px;
+            font-weight: 600;
+            display: block;
+            margin: 10px 0;
+        }
+
+        .boolean-value {
+            color: #4285f4;
+            font-size: 15px;
+            font-weight: 600;
+            display: block;
+            margin: 10px 0;
+        }
+
+        .null-value,
+        .undefined-value {
+            color: #80868b;
+            font-size: 15px;
+            font-style: italic;
+            display: block;
+            margin: 10px 0;
+        }
+
+        .list-container {
+            margin: 15px 0;
+        }
+
+        .list-item {
+            margin: 8px 0;
+            padding-left: 0;
+        }
+
+        .object-container {
+            margin: 10px 0;
+        }
+
+            .object-container .string-value {
+                margin: 8px 0;
+            }
     </style>
 </head>
 <body>
-    <h1>Предложение цены</h1>
-    <div id="componentsContainer" class="loading">Загрузка данных...</div>
+    <div id="componentsContainer">
+        <p style="color: #5f6368;">Загрузка данных...</p>
+    </div>
 
+    <!-- Подключение скриптов в правильном порядке -->
+    <script src="json2html.js"></script>
     <script src="preview-offer.js"></script>
 </body>
 </html>
