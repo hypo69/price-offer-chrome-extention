@@ -1,53 +1,129 @@
-// json2html.js
-// \file json2html.js
+// html2json.js
 // -*- coding: utf-8 -*-
-
 /**
- * Вспомогательные функции для отображения JSON в HTML
+ * Парсит строку от модели и возвращает HTML:
+ * - Если строка содержит JSON → рендерит сборку ПК по шаблону
+ * - Если строка содержит HTML → возвращает как есть
  */
 
-function json2html(json, level = 0, showKeys = true) {
-    const indent = level * 20;
-
-    if (json === null) return '<span class="json-null">null</span>';
-    if (typeof json === 'boolean') return `<span class="json-boolean">${json}</span>`;
-    if (typeof json === 'number') return `<span class="json-number">${json}</span>`;
-    if (typeof json === 'string') {
-        const escaped = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        return `<span class="json-string">"${escaped}"</span>`;
+/**
+ * Основная функция: обрабатывает входную строку и возвращает готовый HTML
+ * @param {string} rawString — строка от Gemini (может быть в блоке ```json или ```html)
+ * @returns {string} — HTML для вставки в DOM
+ */
+function parseResponseToHtml(rawString) {
+    if (!rawString || typeof rawString !== 'string') {
+        return '<p>Ошибка: пустой ответ.</p>';
     }
 
-    if (Array.isArray(json)) {
-        if (json.length === 0) return '<span class="json-bracket">[]</span>';
-
-        let html = '<div class="json-array"><span class="json-bracket">[</span>';
-        json.forEach((item, index) => {
-            html += `<div class="json-item" style="margin-left:${indent + 20}px;">`;
-            html += json2html(item, level + 1, showKeys);
-            if (index < json.length - 1) html += '<span class="json-comma">,</span>';
-            html += '</div>';
-        });
-        html += `<div style="margin-left:${indent}px;"><span class="json-bracket">]</span></div></div>`;
-        return html;
+    // Удаляем markdown fencing: ```json, ```html, ```
+    let cleaned = rawString.trim();
+    if (cleaned.startsWith('```')) {
+        const firstNewline = cleaned.indexOf('\n');
+        if (firstNewline !== -1) {
+            cleaned = cleaned.substring(firstNewline + 1);
+        }
+        cleaned = cleaned.replace(/```$/, '').trim();
     }
 
-    if (typeof json === 'object') {
-        const keys = Object.keys(json);
-        if (keys.length === 0) return '<span class="json-bracket">{}</span>';
-
-        let html = '<div class="json-object"><span class="json-bracket">{</span>';
-        keys.forEach((key, index) => {
-            html += `<div class="json-property" style="margin-left:${indent + 20}px;">`;
-            if (showKeys) html += `<span class="json-key">"${key}"</span><span class="json-colon">: </span>`;
-            html += json2html(json[key], level + 1, showKeys);
-            if (index < keys.length - 1) html += '<span class="json-comma">,</span>';
-            html += '</div>';
-        });
-        html += `<div style="margin-left:${indent}px;"><span class="json-bracket">}</span></div></div>`;
-        return html;
+    // Проверяем: это HTML?
+    if (/<[a-z][\s\S]*>/i.test(cleaned)) {
+        return cleaned; // Возвращаем как есть
     }
 
-    return String(json);
+    // Проверяем: это JSON?
+    try {
+        const data = JSON.parse(cleaned);
+        return renderPcBuildHtml(data);
+    } catch (e) {
+        // Не JSON и не HTML → выводим как текст
+        const div = document.createElement('div');
+        div.textContent = cleaned;
+        return div.innerHTML;
+    }
 }
 
-window.json2html = json2html;
+/**
+ * Рендерит HTML-сборку ПК из JSON-объекта
+ */
+function renderPcBuildHtml(data) {
+    let html = '';
+
+    // Заголовок
+    if (data.title) {
+        html += `<h1 class="offer-title">${escapeHtml(data.title)}</h1>`;
+    }
+
+    // Описание
+    if (data.description) {
+        html += `<div class="description"><p>${escapeHtml(data.description)}</p></div>`;
+    }
+
+    // Компоненты (components)
+    if (Array.isArray(data.components)) {
+        data.components.forEach(component => {
+            const name = component.component_name || 'Компонент';
+            const desc = component.component_description || '';
+            const spec = component.component_specification || '';
+            // Используем component_image, убираем лишние пробелы
+            const imgUrl = (component.component_image || 'https://www.ivory.co.il/files/catalog/org/1722153921d21Qx.webp').trim();
+
+            html += `<article class="component">`;
+            html += `<h2>${escapeHtml(name)}</h2>`;
+            html += `<div class="component-row">`;
+            html += `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(name)}">`;
+            html += `<div class="component-body">`;
+            html += `<p>${escapeHtml(desc)}</p>`;
+
+            if (spec) {
+                html += parseSpecGrid(spec);
+            }
+
+            html += `</div></div></article>`;
+        });
+    }
+
+    return html;
+}
+
+/**
+ * Парсит строку спецификаций вида "Ключ: Значение; ..." → HTML .spec-grid
+ */
+function parseSpecGrid(specString) {
+    const pairs = specString
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+    if (pairs.length === 0) return '';
+
+    let grid = '<div class="spec-grid">';
+    pairs.forEach(pair => {
+        const colonIndex = pair.indexOf(':');
+        if (colonIndex === -1) {
+            grid += `<div>—</div><div>${escapeHtml(pair)}</div>`;
+        } else {
+            const key = pair.substring(0, colonIndex).trim();
+            const value = pair.substring(colonIndex + 1).trim();
+            grid += `<div>${escapeHtml(key)}</div><div>${escapeHtml(value)}</div>`;
+        }
+    });
+    grid += '</div>';
+    return grid;
+}
+
+/**
+ * Экранирование HTML (безопасно!)
+ */
+function escapeHtml(text) {
+    if (typeof text !== 'string') return String(text);
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '<')
+        .replace(/>/g, '>')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// Экспорт в глобальную область
+window.parseResponseToHtml = parseResponseToHtml;

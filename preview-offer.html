@@ -1,3 +1,4 @@
+<!--preview-offer.html-->
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -6,13 +7,13 @@
     <title>Предложение цены</title>
     <link rel="stylesheet" href="css/common.css">
     <style>
-        body {
+        /*body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f5f5f5;
             margin: 0;
             padding: 20px;
         }
-
+        */
         #componentsContainer {
             max-width: 1200px;
             margin: 0 auto;
@@ -85,7 +86,7 @@
             margin: 2px 0;
         }
 
-        /* HTML Document Styles */
+         HTML Document Styles 
         .offer-document {
             max-width: 900px;
             margin: 0 auto;
@@ -166,6 +167,82 @@
             .object-container .string-value {
                 margin: 8px 0;
             }
+
+
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.5;
+            margin: 20px;
+            color: #222;
+        }
+
+        .description {
+            margin: 12px 0 24px 0;
+            padding: 12px;
+            background: #f8f9fb;
+            border-radius: 6px;
+            border: 1px solid #e6e9ee;
+        }
+
+        .component {
+            margin: 24px 0;
+            padding: 16px;
+            border-radius: 6px;
+            border: 1px solid #e9eef5;
+            background: #fff;
+        }
+
+        .component-row {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            margin-top: 8px;
+        }
+
+            .component-row img {
+                max-width: 180px;
+                width: 100%;
+                height: auto;
+                object-fit: contain;
+                border-radius: 4px;
+                border: 1px solid #ddd;
+                background: #fff;
+            }
+
+        .component-body p {
+            margin: 6px 0;
+        }
+
+        /* ✅ CSS GRID для спецификаций */
+        .spec-grid {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 6px 16px;
+            margin-top: 12px;
+            font-size: 14px;
+            padding: 12px;
+            background: #fbfcfe;
+            border: 1px solid #eef2f8;
+            border-radius: 4px;
+        }
+
+            .spec-grid div:first-child {
+                font-weight: bold;
+            }
+
+        @media (max-width: 640px) {
+            .component-row {
+                flex-direction: column;
+            }
+
+                .component-row img {
+                    max-width: 100%;
+                }
+
+            .spec-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
