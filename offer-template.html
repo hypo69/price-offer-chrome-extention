@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Универсальный настольный ПК</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.45;
+            margin: 20px;
+            color: #222;
+        }
+
+        .description {
+            margin: 12px 0 24px 0;
+            padding: 12px;
+            background: #f8f9fb;
+            border-radius: 6px;
+            border: 1px solid #e6e9ee;
+        }
+
+        .component {
+            margin: 18px 0;
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid #e9eef5;
+            background: #fff;
+        }
+
+        .component-row {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            margin-top: 8px;
+        }
+
+            .component-row img {
+                max-width: 160px;
+                width: 100%;
+                height: auto;
+                object-fit: contain;
+                border-radius: 4px;
+                border: 1px solid #ddd;
+                background: #fff;
+            }
+
+        .component-body {
+            flex: 1;
+        }
+
+            .component-body p {
+                margin: 6px 0;
+            }
+
+        .spec {
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+            background: #fbfcfe;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #eef2f8;
+            margin-top: 8px;
+        }
+
+        @media (max-width: 640px) {
+            .component-row {
+                flex-direction: column;
+            }
+
+                .component-row img {
+                    max-width: 100%;
+                    margin: 0 auto;
+                }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. Название сборки (title) -> H1 -->
+    <h1>Универсальный настольный ПК с Intel Core i5 и Windows 11</h1>
+
+    <!-- 2. description<div> -->
+    <div class="description">
+        Этот компьютер — отличный выбор для повседневных задач, работы, учебы и мультимедиа. Оснащен производительным
+        процессором Intel Core i5-12400 и быстрым SSD-накопителем, что обеспечивает плавную работу системы и быстрый запуск
+        приложений. Благодаря 16 ГБ оперативной памяти вы сможете комфортно работать с несколькими программами одновременно,
+        а предустановленная Windows 11 Home делает его готовым к использованию сразу после покупки.
+    </div>
+
+    <!-- components -->
+    <section aria-label="Components">
+
+        <!-- Component 1 -->
+        <article class="component" id="component-1">
+            <h2>Процессор Intel Core i5-12400</h2>
+            <div class="component-row">
+                <img src="https://www.ivory.co.il/files/catalog/org/1722153921d21Qx.webp" alt="Процессор Intel Core i5-12400">
+                <div class="component-body">
+                    <p>
+                        Шестиядерный процессор 12-го поколения из семейства Alder Lake, обеспечивающий высокую производительность
+                        для широкого круга задач, от офисной работы и учебы до запуска современных игр на средних настройках.
+                    </p>
+                    <div class="spec">
+                        Сокет: LGA1700; Ядра/потоки: 6/12; Базовая частота: 2.5 ГГц; Максимальная частота в режиме Turbo Boost: 4.4 ГГц;
+                        Кэш L3: 18 МБ; Интегрированная графика: Intel UHD Graphics 730.
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <!-- Component 2 -->
+        <article class="component" id="component-2">
+            <h2>Материнская плата на чипсете H610</h2>
+            <div class="component-row">
+                <img src="https://www.ivory.co.il/files/catalog/org/1722153921d21Qx.webp" alt="Материнская плата H610">
+                <div class="component-body">
+                    <p>
+                        Надежная материнская плата начального уровня, предоставляющая необходимый функционал для построения стабильной
+                        системы на базе процессоров Intel 12-го поколения.
+                    </p>
+                    <div class="spec">
+                        Чипсет: Intel H610; Сокет: LGA1700; Поддержка ОЗУ: DDR4 (обычно 2 слота); Основные интерфейсы: PCIe 4.0, SATA 6 Гбит/с,
+                        USB 3.2 Gen 1.
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <!-- Component 3 -->
+        <article class="component" id="component-3">
+            <h2>Оперативная память 16 ГБ</h2>
+            <div class="component-row">
+                <img src="https://www.ivory.co.il/files/catalog/org/1722153921d21Qx.webp" alt="Оперативная память 16 ГБ">
+                <div class="component-body">
+                    <p>
+                        Достаточный объем оперативной памяти, обеспечивающий комфортную работу в большинстве современных приложений,
+                        веб-серфинг и многозадачность.
+                    </p>
+                    <div class="spec">
+                        Объем: 16 ГБ; Тип: DDR4; Конфигурация: может быть одной планкой 16 ГБ или двумя по 8 ГБ.
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <!-- Component 4 -->
+        <article class="component" id="component-4">
+            <h2>Твердотельный накопитель (SSD) 512 ГБ</h2>
+            <div class="component-row">
+                <img src="https://www.ivory.co.il/files/catalog/org/1722153921d21Qx.webp" alt="SSD 512 ГБ">
+                <div class="component-body">
+                    <p>
+                        Высокоскоростной SSD-накопитель, значительно ускоряющий загрузку операционной системы, запуск программ и общую
+                        отзывчивость компьютера по сравнению с традиционными жесткими дисками.
+                    </p>
+                    <div class="spec">
+                        Объем: 512 ГБ; Тип: SSD; Интерфейс: SATA или NVMe (зависит от конкретной модели и материнской платы).
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <!-- Component 5 -->
+        <article class="component" id="component-5">
+            <h2>Операционная система Windows 11 Home</h2>
+            <div class="component-row">
+                <img src="https://www.ivory.co.il/files/catalog/org/1722153921d21Qx.webp" alt="Windows 11 Home">
+                <div class="component-body">
+                    <p>
+                        Современная, безопасная и удобная операционная система от Microsoft, предлагающая обновленный интерфейс,
+                        улучшенную производительность и широкие возможности для работы, творчества и развлечений.
+                    </p>
+                    <div class="spec">
+                        Версия: Home; Предустановленная: Да; Поддержка DirectX 12, виджеты, Snap Layouts.
+                    </div>
+                </div>
+            </div>
+        </article>
+
+    </section>
+
+</body>
+</html>
