@@ -13,29 +13,14 @@ importScripts('logger.js', 'ui-manager.js', 'gemini.js', 'menu.js', 'handlers.js
 const logger = new Logger('__kazarinov_logs__', 100);
 const menuManager = new MenuManager(logger);
 
-/**
- * Состояние обработчика меню
- * Хранение информации о последнем клике для debounce
- */
 const MenuClickState = {
     lastClickTime: 0,
     lastMenuItemId: null,
     processing: false
 };
 
-/**
- * Конфигурация debounce для кликов по меню
- */
 const DEBOUNCE_TIME = 500;
 
-/**
- * Отображение результата пользователю
- * Функция выбирает способ отображения в зависимости от доступности content script
- * 
- * Args:
- *     tabId (number): ID вкладки
- *     summary (string): Текст результата для отображения
- */
 async function showResultToUser(tabId, summary) {
     logger.debug('Попытка отображения результата пользователю', { tabId: tabId });
 
@@ -62,14 +47,6 @@ async function showResultToUser(tabId, summary) {
     });
 }
 
-/**
- * Сохранение предложения с пользовательским названием
- * Функция запрашивает имя предложения и сохраняет его в storage
- * 
- * Args:
- *     tabId (number): ID вкладки
- *     result (string): Данные результата для сохранения
- */
 async function saveOffer(tabId, result) {
     try {
         const injectionResult = await chrome.scripting.executeScript({
@@ -109,43 +86,17 @@ async function saveOffer(tabId, result) {
     }
 }
 
-/**
- * Проверка доступности вкладки
- * Функция определяет, можно ли выполнять операции на данной вкладке
- * 
- * Args:
- *     tab (Object): Объект вкладки Chrome
- * 
- * Returns:
- *     boolean: true если вкладка доступна, иначе false
- */
 function isTabAccessible(tab) {
-    if (!tab || !tab.url) {
-        return false;
-    }
-
+    if (!tab || !tab.url) return false;
     const restrictedProtocols = ['chrome://', 'edge://', 'about:', 'file://'];
     return !restrictedProtocols.some(protocol => tab.url.startsWith(protocol));
 }
 
-/**
- * Обработчик установки/обновления расширения
- * Функция инициализирует контекстное меню при первом запуске
- */
 chrome.runtime.onInstalled.addListener(async () => {
     logger.info('Расширение установлено/обновлено');
     await menuManager.initialize();
 });
 
-/**
- * Глобальный обработчик кликов по контекстному меню
- * Единственное место обработки всех событий меню
- * Реализован debounce для предотвращения множественных кликов
- * 
- * Args:
- *     info (Object): Информация о клике по меню
- *     tab (Object): Объект текущей вкладки
- */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const now = Date.now();
     const timeSinceLastClick = now - MenuClickState.lastClickTime;
@@ -159,10 +110,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (MenuClickState.processing &&
         info.menuItemId === MenuClickState.lastMenuItemId &&
         timeSinceLastClick < DEBOUNCE_TIME) {
-        logger.warn('Клик проигнорирован - debounce активен', {
-            menuItemId: info.menuItemId,
-            timeSinceLastClick: timeSinceLastClick
-        });
+        logger.warn('Клик проигнорирован - debounce активен', { menuItemId: info.menuItemId });
         return;
     }
 
@@ -177,10 +125,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
     try {
         if (!isTabAccessible(tab)) {
-            UIManager.showNotification(
-                'Price Offer Generator',
-                'Действие недоступно на этой странице.'
-            );
+            UIManager.showNotification('Price Offer Generator', 'Действие недоступно на этой странице.');
             logger.warn('Попытка использования на недоступной странице', { url: tab.url });
             return;
         }
@@ -188,11 +133,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         const menuItemId = info.menuItemId;
         const MENU_CONFIG = MenuManager.CONFIG;
 
-        logger.info('Обработка клика по пункту меню', {
-            menuItemId: menuItemId,
-            tabId: tab.id,
-            url: tab.url
-        });
+        logger.info('Обработка клика по пункту меню', { menuItemId, tabId: tab.id, url: tab.url });
 
         if (menuItemId === MENU_CONFIG.ADD_COMPONENT_ID) {
             await handleAddComponent(tab);
@@ -215,7 +156,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }
 
         if (menuItemId === MENU_CONFIG.GENERATE_OFFER_FROM_COMPONENTS_ID) {
-            await handleGenerateOffer(tab);
+            await handleGenerateOfferWithUI(tab);
             return;
         }
     } catch (ex) {
@@ -232,18 +173,42 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 });
 
-// logger.info('Background script инициализирован и готов к работе');
+/**
+ * Новый handler с пошаговыми индикаторами
+ */
+async function handleGenerateOfferWithUI(tab) {
+    try {
+        UIManager.showIndicator(tab.id, 'Собираем компоненты...');
+        const components = await getComponentsForOffer();
+        if (!components || components.length === 0) {
+            UIManager.showError(tab.id, 'Нет компонентов для генерации предложения', 4000, true);
+            return;
+        }
+
+        UIManager.showIndicator(tab.id, 'Формируем текст запроса...');
+        const pageText = components.map(c => c.text).join('\n');
+        const apiKey = await getGeminiApiKey();
+        const model = await getGeminiModel();
+
+        UIManager.showIndicator(tab.id, 'Отправка запроса в Gemini...');
+        const resultText = await GeminiAPI.getFullPriceOffer(pageText, apiKey, model);
+
+        UIManager.showIndicator(tab.id, 'Парсим ответ модели...');
+        const resultJSON = await GeminiAPI.getModelResponseJSON(pageText, apiKey, model);
+
+        UIManager.hideIndicator(tab.id);
+        UIManager.showModal(tab.id, JSON.stringify(resultJSON, null, 2));
+        UIManager.showNotification(tab.id, 'Предложение успешно сгенерировано');
+
+    } catch (ex) {
+        UIManager.hideIndicator(tab.id);
+        UIManager.showError(tab.id, 'Ошибка при генерации предложения', 4000, true);
+        logger.error('Ошибка handleGenerateOfferWithUI', { error: ex.message, stack: ex.stack });
+    }
+}
 
 /**
  * Отладочные функции для диагностики
- * Доступны в консоли background script
- */
-
-/**
- * Проверка всех открытых вкладок preview-offer.html
- * 
- * Returns:
- *     Promise<Array>: Массив объектов вкладок
  */
 self.checkPreviewTabs = async function () {
     const previewUrl = chrome.runtime.getURL('preview-offer.html');
@@ -262,9 +227,6 @@ self.checkPreviewTabs = async function () {
     return tabs;
 };
 
-/**
- * Проверка состояния обработчиков
- */
 self.checkState = function () {
     logger.debug('=== ПРОВЕРКА СОСТОЯНИЯ ===');
     logger.debug('MenuClickState:', {
@@ -284,9 +246,6 @@ self.checkState = function () {
     }
 };
 
-/**
- * Закрытие всех дублирующих вкладок
- */
 self.closeAllPreviewTabs = async function () {
     const tabs = await self.checkPreviewTabs();
 
@@ -305,9 +264,6 @@ self.closeAllPreviewTabs = async function () {
     logger.debug('Все дублирующие вкладки закрыты');
 };
 
-/**
- * Полная диагностика расширения
- */
 self.fullDiagnostic = async function () {
     logger.debug('\n╔════════════════════════════════════════════╗');
     logger.debug('║   ПОЛНАЯ ДИАГНОСТИКА РАСШИРЕНИЯ           ║');
@@ -336,9 +292,6 @@ self.fullDiagnostic = async function () {
     logger.debug('╚════════════════════════════════════════════╝\n');
 };
 
-/**
- * Сброс всех флагов состояния
- */
 self.resetAllFlags = function () {
     logger.debug('Принудительный сброс всех флагов...');
 
@@ -362,14 +315,10 @@ setTimeout(() => {
     logger.debug('\n╔════════════════════════════════════════════╗');
     logger.debug('║   ОТЛАДОЧНЫЕ КОМАНДЫ ДОСТУПНЫ             ║');
     logger.debug('╚════════════════════════════════════════════╝');
-    logger.debug('');
-    logger.debug('Доступные команды:');
-    logger.debug('  - fullDiagnostic()      : Полная диагностика');
-    logger.debug('  - checkPreviewTabs()    : Проверка вкладок preview-offer');
-    logger.debug('  - checkState()          : Проверка состояния');
-    logger.debug('  - closeAllPreviewTabs() : Закрыть все дублирующие вкладки');
-    logger.debug('  - resetAllFlags()       : Сброс всех флагов');
-    logger.debug('');
-    logger.debug('Тест: Попробуйте выполнить fullDiagnostic()');
-    logger.debug('');
-}, 100);
+    logger.debug('Используйте в консоли background.js:');
+    logger.debug('  checkPreviewTabs()');
+    logger.debug('  checkState()');
+    logger.debug('  closeAllPreviewTabs()');
+    logger.debug('  fullDiagnostic()');
+    logger.debug('  resetAllFlags()\n');
+}, 3000);
