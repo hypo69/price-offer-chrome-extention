@@ -16,76 +16,81 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-.view-toggle-btn {
-    padding: 8px 16px;
-    background-color: #f1f3f4;
-    color: #5f6368;
-    border: none;
-    border-radius: 4px 4px 0 0;
+/* === СТИЛИ ДЛЯ ТАБОВ === */
+.tab-controls {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    padding: 10px 20px;
     cursor: pointer;
+    border: none;
+    background-color: transparent;
+    font-size: 16px;
+    color: #5f6368;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px; /* Накладывается на нижнюю границу .tab-controls */
+}
+
+    .tab-button.active {
+        color: #4285f4;
+        border-bottom-color: #4285f4;
+        font-weight: 600;
+    }
+
+.tab-content {
+    display: none; /* Все вкладки по умолчанию скрыты */
+}
+
+    .tab-content.active {
+        display: block; /* Активная вкладка отображается */
+    }
+
+/* === СТИЛИ ДЛЯ JSON РЕДАКТОРА === */
+#json-editor {
+    width: 100%;
+    min-height: 500px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'Courier New', Courier, monospace;
     font-size: 14px;
-    transition: all 0.2s;
+    line-height: 1.6;
+    resize: vertical;
+    box-sizing: border-box; /* Учитывает padding и border в общей ширине */
 }
 
-    .view-toggle-btn:hover {
-        background-color: #e8eaed;
+#save-json-button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    background-color: #34a853;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+    #save-json-button:hover {
+        background-color: #2c8f45;
     }
 
-    .view-toggle-btn.active {
-        background-color: #4285f4;
-        color: white;
-    }
 
-/* JSON highlighting */
-.json-key {
-    color: #0451a5;
-    font-weight: 600;
+/* === СТИЛИ ДЛЯ HTML ПРЕДСТАВЛЕНИЯ (по вашему шаблону) === */
+.offer-title {
+    font-size: 2em;
+    margin-bottom: 1em;
 }
 
-.json-string {
-    color: #0a8000;
-}
-
-.json-number {
-    color: #098658;
-}
-
-.json-boolean {
-    color: #0000ff;
-}
-
-.json-null {
-    color: #808080;
-}
-
-.json-bracket {
-    color: #000000;
-    font-weight: bold;
-}
-
-.json-colon {
-    color: #000000;
-}
-
-.json-comma {
-    color: #000000;
-}
-
-.json-array, .json-object {
-    margin: 0;
-}
-
-.json-property, .json-item {
-    margin: 2px 0;
-}
-
-/* PC Build Styles */
 .description {
     margin: 12px 0 24px 0;
     padding: 12px;
     background: #f8f9fb;
     border-radius: 6px;
     border: 1px solid #e6e9ee;
+    line-height: 1.6;
 }
 
 .component {
@@ -95,6 +100,10 @@ body {
     border: 1px solid #e9eef5;
     background: #fff;
 }
+
+    .component h2 {
+        margin-top: 0;
+    }
 
 .component-row {
     display: flex;
@@ -115,46 +124,17 @@ body {
 
 .component-body p {
     margin: 6px 0;
+    line-height: 1.6;
 }
 
-.spec-grid {
-    display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 6px 16px;
-    margin-top: 12px;
-    font-size: 14px;
-    padding: 12px;
-    background: #fbfcfe;
-    border: 1px solid #eef2f8;
+.spec {
+    font-size: 0.9em;
+    color: #333;
+    background-color: #f9f9f9;
+    padding: 10px;
     border-radius: 4px;
-}
-
-    .spec-grid div:first-child {
-        font-weight: bold;
-    }
-
-/* Footer Styles */
-.offer-footer {
-    margin-top: 40px;
-    padding-top: 20px;
-    border-top: 1px solid #e0e0e0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 20px;
-    color: #5f6368;
-    font-size: 12px;
-}
-
-.footer-info p {
-    margin: 4px 0;
-}
-
-.footer-image img {
-    max-width: 150px;
-    height: auto;
-    border-radius: 8px;
-    opacity: 0.8;
+    margin-top: 10px;
+    line-height: 1.5;
 }
 
 @media (max-width: 640px) {
@@ -165,13 +145,4 @@ body {
         .component-row img {
             max-width: 100%;
         }
-
-    .spec-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .offer-footer {
-        flex-direction: column;
-        text-align: center;
-    }
 }

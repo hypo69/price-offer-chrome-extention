@@ -1,141 +1,106 @@
 // json2html.js
 // -*- coding: utf-8 -*-
 /**
- * Парсит строку от модели и возвращает HTML:
- * - Если строка содержит JSON → рендерит сборку ПК по шаблону
- * - Если строка содержит HTML → возвращает как есть
+ * Парсит JSON-объект и возвращает HTML по заданному шаблону.
  */
 
 /**
- * Основная функция: обрабатывает входные данные и возвращает готовый HTML
- * @param {string|Object} rawData — строка от Gemini или уже распарсенный JSON-объект
- * @returns {string} — HTML для вставки в DOM
+ * Основная функция: обрабатывает входные данные и возвращает готовый HTML.
+ * @param {string|Object} rawData — строка от Gemini или уже распарсенный JSON-объект.
+ * @returns {string} — HTML для вставки в DOM.
  */
 function parseResponseToHtml(rawData) {
-    // ИСПРАВЛЕНО: Теперь функция может принимать и строки, и объекты.
     if (!rawData) {
-        return '<p>Ошибка: пустой ответ.</p>';
+        return '<p class="error-message">Ошибка: пустой ответ.</p>';
     }
 
-    let cleaned;
-    let data;
+    let dataObject;
 
-    // Если на вход пришла строка, обрабатываем ее
-    if (typeof rawData === 'string') {
-        // Удаляем markdown fencing: ```json, ```html, ```
-        cleaned = rawData.trim();
-        if (cleaned.startsWith('```')) {
-            const firstNewline = cleaned.indexOf('\n');
-            if (firstNewline !== -1) {
-                cleaned = cleaned.substring(firstNewline + 1);
-            }
-            cleaned = cleaned.replace(/```$/, '').trim();
+    if (typeof rawData === 'object' && rawData !== null) {
+        dataObject = rawData;
+    } else if (typeof rawData === 'string') {
+        let cleanedString = rawData.trim();
+        if (cleanedString.startsWith('```')) {
+            cleanedString = cleanedString.substring(cleanedString.indexOf('\n') + 1).replace(/```$/, '').trim();
         }
-
-        // Проверяем: это HTML?
-        if (/<[a-z][\s\S]*>/i.test(cleaned)) {
-            return cleaned; // Возвращаем как есть
-        }
-
-        // Пытаемся распарсить как JSON
         try {
-            data = JSON.parse(cleaned);
+            dataObject = JSON.parse(cleanedString);
         } catch (e) {
-            // Не JSON и не HTML → выводим как текст
-            const div = document.createElement('div');
-            div.textContent = cleaned;
-            return div.innerHTML;
+            return `<p class="error-message">Ошибка: не удалось обработать данные как JSON. ${e.message}</p>`;
         }
-    } else if (typeof rawData === 'object') {
-        // Если на вход сразу пришел объект, используем его
-        data = rawData;
     } else {
-        return '<p>Ошибка: неверный формат данных.</p>';
+        return `<p class="error-message">Ошибка: неподдерживаемый формат данных (тип: ${typeof rawData}).</p>`;
     }
 
-    // Если у нас есть объект `data`, рендерим его в HTML
-    return renderPcBuildHtml(data);
+    return renderPcBuildHtml(dataObject);
 }
 
 /**
- * Рендерит HTML-сборку ПК из JSON-объекта
- * @param {Object} data — JSON объект с полями title, description, products
- * @returns {string} — HTML сборки
+ * Рендерит HTML-сборку ПК из JSON-объекта по заданному шаблону.
+ * @param {Object} data — JSON объект.
+ * @returns {string} — HTML сборки.
  */
 function renderPcBuildHtml(data) {
+    if (typeof data !== 'object' || data === null) {
+        return '<p class="error-message">Ошибка: данные для рендеринга не являются объектом.</p>';
+    }
+
     let html = '';
 
-    // Заголовок
+    // 1. Название сборки (title) -> H1
     if (data.title) {
-        html += `<h1 class="offer-title">${escapeHtml(data.title)}</h1>`;
+        html += `<h1>${escapeHtml(data.title)}</h1>`;
     }
 
-    // Описание
+    // 2. description -> div.description
     if (data.description) {
-        html += `<div class="description"><p>${escapeHtml(data.description)}</p></div>`;
+        html += `<div class="description">${escapeHtml(data.description)}</div>`;
     }
 
-    // Компоненты (products)
-    if (Array.isArray(data.products)) {
-        data.products.forEach(product => {
-            const name = product.product_name || 'Компонент';
-            const desc = product.product_description || '';
-            const spec = product.product_specification || '';
-            // Используем изображение из данных, если оно есть, иначе заглушку
-            const imgUrl = product.component_image || 'https://www.ivory.co.il/files/catalog/org/1722153921d21Qx.webp';
+    // 3. Компоненты -> section > article.component
+    // ▼▼▼▼▼ ИЗМЕНЕНИЕ ЗДЕСЬ ▼▼▼▼▼
+    if (Array.isArray(data.components)) { // БЫЛО: data.products
+        let componentsHtml = '';
+        data.components.forEach((product, index) => { // БЫЛО: data.products
+            const name = product.component_name || 'Компонент';
+            const desc = product.component_description || '';
+            const spec = product.component_specification || '';
+            const imgUrl = product.component_image || 'https://via.placeholder.com/180';
 
-            html += `<article class="component">`;
-            html += `<h2>${escapeHtml(name)}</h2>`;
-            html += `<div class="component-row">`;
-            html += `<img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(name)}">`;
-            html += `<div class="component-body">`;
-            html += `<p>${escapeHtml(desc)}</p>`;
-
-            if (spec) {
-                // ИСПРАВЛЕНО: Спецификации теперь могут быть массивом
-                const specString = Array.isArray(spec) ? spec.join('; ') : spec;
-                html += parseSpecGrid(specString);
+            // ИСПРАВЛЕНО: Спецификации теперь могут быть объектом, преобразуем в строку
+            let specString = '';
+            if (typeof spec === 'object' && spec !== null) {
+                specString = Object.entries(spec)
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join('; ');
+            } else if (spec) {
+                specString = Array.isArray(spec) ? spec.join('; ') : String(spec);
             }
 
-            html += `</div></div></article>`;
+            componentsHtml += `
+                <article class="component" id="component-${index + 1}">
+                    <h2>${escapeHtml(name)}</h2>
+                    <div class="component-row">
+                        <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(name)}">
+                        <div class="component-body">
+                            <p>${escapeHtml(desc)}</p>
+                            <div class="spec">${escapeHtml(specString)}</div>
+                        </div>
+                    </div>
+                </article>
+            `;
         });
+        html += `<section aria-label="Components">${componentsHtml}</section>`;
     }
+    // ▲▲▲▲▲ КОНЕЦ ИЗМЕНЕНИЯ ▲▲▲▲▲
 
     return html;
 }
 
 /**
- * Парсит строку спецификаций вида "Ключ: Значение; ..." → HTML .spec-grid
- * @param {string} specString — строка спецификаций
- * @returns {string} — HTML сетка спецификаций
- */
-function parseSpecGrid(specString) {
-    const pairs = specString
-        .split(';')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
-
-    if (pairs.length === 0) return '';
-
-    let grid = '<div class="spec-grid">';
-    pairs.forEach(pair => {
-        const colonIndex = pair.indexOf(':');
-        if (colonIndex === -1) {
-            grid += `<div>—</div><div>${escapeHtml(pair)}</div>`;
-        } else {
-            const key = pair.substring(0, colonIndex).trim();
-            const value = pair.substring(colonIndex + 1).trim();
-            grid += `<div>${escapeHtml(key)}</div><div>${escapeHtml(value)}</div>`;
-        }
-    });
-    grid += '</div>';
-    return grid;
-}
-
-/**
- * Экранирование HTML (безопасно!)
- * @param {string} text — исходный текст
- * @returns {string} — безопасный HTML
+ * Безопасное экранирование HTML-тегов.
+ * @param {string} text — исходный текст.
+ * @returns {string} — безопасный HTML.
  */
 function escapeHtml(text) {
     if (typeof text !== 'string') return String(text);
@@ -147,5 +112,4 @@ function escapeHtml(text) {
         .replace(/'/g, '&#039;');
 }
 
-// Экспорт в глобальную область
 window.parseResponseToHtml = parseResponseToHtml;
