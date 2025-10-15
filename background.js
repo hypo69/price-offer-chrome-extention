@@ -1,16 +1,7 @@
 // background.js
-// \file background.js
-// -*- coding: utf-8 -*-
-
-/**
- * Модуль фоновой службы расширения
- * =================================
- * Оркестрация событий и управление основной логикой расширения
- */
 
 importScripts('logger.js', 'ui-manager.js', 'gemini.js', 'menu.js', 'handlers.js');
 
-const logger = new Logger('__kazarinov_logs__', 100);
 const menuManager = new MenuManager(logger);
 
 const MenuClickState = {
@@ -156,7 +147,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }
 
         if (menuItemId === MENU_CONFIG.GENERATE_OFFER_FROM_COMPONENTS_ID) {
-            await handleGenerateOfferWithUI(tab);
+            await handleGenerateOffer(tab);
             return;
         }
     } catch (ex) {
@@ -173,74 +164,25 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 });
 
-/**
- * Новый handler с пошаговыми индикаторами
- */
-async function handleGenerateOfferWithUI(tab) {
-    try {
-        UIManager.showIndicator(tab.id, 'Собираем компоненты...');
-        const components = await getComponentsForOffer();
-        if (!components || components.length === 0) {
-            UIManager.showError(tab.id, 'Нет компонентов для генерации предложения', 4000, true);
-            return;
-        }
-
-        UIManager.showIndicator(tab.id, 'Формируем текст запроса...');
-        const pageText = components.map(c => c.text).join('\n');
-        const apiKey = await getGeminiApiKey();
-        const model = await getGeminiModel();
-
-        UIManager.showIndicator(tab.id, 'Отправка запроса в Gemini...');
-        const resultText = await GeminiAPI.getFullPriceOffer(pageText, apiKey, model);
-
-        UIManager.showIndicator(tab.id, 'Парсим ответ модели...');
-        const resultJSON = await GeminiAPI.getModelResponseJSON(pageText, apiKey, model);
-
-        UIManager.hideIndicator(tab.id);
-        UIManager.showModal(tab.id, JSON.stringify(resultJSON, null, 2));
-        UIManager.showNotification(tab.id, 'Предложение успешно сгенерировано');
-
-    } catch (ex) {
-        UIManager.hideIndicator(tab.id);
-        UIManager.showError(tab.id, 'Ошибка при генерации предложения', 4000, true);
-        logger.error('Ошибка handleGenerateOfferWithUI', { error: ex.message, stack: ex.stack });
-    }
-}
-
-/**
- * Отладочные функции для диагностики
- */
 self.checkPreviewTabs = async function () {
     const previewUrl = chrome.runtime.getURL('preview-offer.html');
     const tabs = await chrome.tabs.query({ url: previewUrl });
-
     logger.debug('=== ПРОВЕРКА ВКЛАДОК PREVIEW-OFFER ===');
     logger.debug(`Найдено вкладок: ${tabs.length}`);
-
     if (tabs.length > 0) {
         logger.debug('Список вкладок:');
         tabs.forEach((tab, index) => {
             logger.debug(`  ${index + 1}. Tab ID: ${tab.id}, Window ID: ${tab.windowId}, Active: ${tab.active}`);
         });
     }
-
     return tabs;
 };
 
 self.checkState = function () {
     logger.debug('=== ПРОВЕРКА СОСТОЯНИЯ ===');
-    logger.debug('MenuClickState:', {
-        processing: MenuClickState.processing,
-        lastClickTime: MenuClickState.lastClickTime,
-        lastMenuItemId: MenuClickState.lastMenuItemId,
-        timeSinceLastClick: Date.now() - MenuClickState.lastClickTime
-    });
-
+    logger.debug('MenuClickState:', { processing: MenuClickState.processing, lastClickTime: MenuClickState.lastClickTime, lastMenuItemId: MenuClickState.lastMenuItemId, timeSinceLastClick: Date.now() - MenuClickState.lastClickTime });
     if (typeof previewTabMutex !== 'undefined') {
-        logger.debug('previewTabMutex:', {
-            locked: previewTabMutex.locked,
-            waitingCount: previewTabMutex.waiting.length
-        });
+        logger.debug('previewTabMutex:', { locked: previewTabMutex.locked, waitingCount: previewTabMutex.waiting.length });
     } else {
         logger.debug('previewTabMutex: НЕ ОПРЕДЕЛЕН (проверьте handlers.js)');
     }
@@ -248,19 +190,15 @@ self.checkState = function () {
 
 self.closeAllPreviewTabs = async function () {
     const tabs = await self.checkPreviewTabs();
-
     if (tabs.length <= 1) {
         logger.debug('Дублирующих вкладок не найдено');
         return;
     }
-
     logger.debug(`Закрытие ${tabs.length - 1} дублирующих вкладок...`);
-
     for (let i = 1; i < tabs.length; i++) {
         await chrome.tabs.remove(tabs[i].id);
         logger.debug(`Закрыта вкладка ${tabs[i].id}`);
     }
-
     logger.debug('Все дублирующие вкладки закрыты');
 };
 
@@ -268,25 +206,16 @@ self.fullDiagnostic = async function () {
     logger.debug('\n╔════════════════════════════════════════════╗');
     logger.debug('║   ПОЛНАЯ ДИАГНОСТИКА РАСШИРЕНИЯ           ║');
     logger.debug('╚════════════════════════════════════════════╝\n');
-
     await self.checkPreviewTabs();
     logger.debug('');
     self.checkState();
     logger.debug('');
-
-    const storage = await chrome.storage.local.get([
-        'addedComponents',
-        'componentsForOffer',
-        'previewOfferTabId',
-        'previewOfferData'
-    ]);
-
+    const storage = await chrome.storage.local.get(['addedComponents', 'componentsForOffer', 'previewOfferTabId', 'previewOfferData']);
     logger.debug('=== ПРОВЕРКА STORAGE ===');
     logger.debug('addedComponents:', storage.addedComponents?.length || 0);
     logger.debug('componentsForOffer:', storage.componentsForOffer?.length || 0);
     logger.debug('previewOfferTabId:', storage.previewOfferTabId);
     logger.debug('previewOfferData:', storage.previewOfferData ? 'присутствует' : 'отсутствует');
-
     logger.debug('\n╔════════════════════════════════════════════╗');
     logger.debug('║   ДИАГНОСТИКА ЗАВЕРШЕНА                   ║');
     logger.debug('╚════════════════════════════════════════════╝\n');
@@ -294,12 +223,10 @@ self.fullDiagnostic = async function () {
 
 self.resetAllFlags = function () {
     logger.debug('Принудительный сброс всех флагов...');
-
     MenuClickState.processing = false;
     MenuClickState.lastClickTime = 0;
     MenuClickState.lastMenuItemId = null;
     logger.debug('✓ MenuClickState сброшен');
-
     if (typeof previewTabMutex !== 'undefined') {
         previewTabMutex.locked = false;
         previewTabMutex.waiting = [];
@@ -307,7 +234,6 @@ self.resetAllFlags = function () {
     } else {
         logger.debug('⚠ previewTabMutex не определен');
     }
-
     logger.debug('Все флаги сброшены');
 };
 

@@ -7,40 +7,54 @@
  */
 
 /**
- * Основная функция: обрабатывает входную строку и возвращает готовый HTML
- * @param {string} rawString — строка от Gemini (может быть в блоке ```json или ```html)
+ * Основная функция: обрабатывает входные данные и возвращает готовый HTML
+ * @param {string|Object} rawData — строка от Gemini или уже распарсенный JSON-объект
  * @returns {string} — HTML для вставки в DOM
  */
-function parseResponseToHtml(rawString) {
-    if (!rawString || typeof rawString !== 'string') {
+function parseResponseToHtml(rawData) {
+    // ИСПРАВЛЕНО: Теперь функция может принимать и строки, и объекты.
+    if (!rawData) {
         return '<p>Ошибка: пустой ответ.</p>';
     }
 
-    // Удаляем markdown fencing: ```json, ```html, ```
-    let cleaned = rawString.trim();
-    if (cleaned.startsWith('```')) {
-        const firstNewline = cleaned.indexOf('\n');
-        if (firstNewline !== -1) {
-            cleaned = cleaned.substring(firstNewline + 1);
+    let cleaned;
+    let data;
+
+    // Если на вход пришла строка, обрабатываем ее
+    if (typeof rawData === 'string') {
+        // Удаляем markdown fencing: ```json, ```html, ```
+        cleaned = rawData.trim();
+        if (cleaned.startsWith('```')) {
+            const firstNewline = cleaned.indexOf('\n');
+            if (firstNewline !== -1) {
+                cleaned = cleaned.substring(firstNewline + 1);
+            }
+            cleaned = cleaned.replace(/```$/, '').trim();
         }
-        cleaned = cleaned.replace(/```$/, '').trim();
+
+        // Проверяем: это HTML?
+        if (/<[a-z][\s\S]*>/i.test(cleaned)) {
+            return cleaned; // Возвращаем как есть
+        }
+
+        // Пытаемся распарсить как JSON
+        try {
+            data = JSON.parse(cleaned);
+        } catch (e) {
+            // Не JSON и не HTML → выводим как текст
+            const div = document.createElement('div');
+            div.textContent = cleaned;
+            return div.innerHTML;
+        }
+    } else if (typeof rawData === 'object') {
+        // Если на вход сразу пришел объект, используем его
+        data = rawData;
+    } else {
+        return '<p>Ошибка: неверный формат данных.</p>';
     }
 
-    // Проверяем: это HTML?
-    if (/<[a-z][\s\S]*>/i.test(cleaned)) {
-        return cleaned; // Возвращаем как есть
-    }
-
-    // Проверяем: это JSON?
-    try {
-        const data = JSON.parse(cleaned);
-        return renderPcBuildHtml(data);
-    } catch (e) {
-        // Не JSON и не HTML → выводим как текст
-        const div = document.createElement('div');
-        div.textContent = cleaned;
-        return div.innerHTML;
-    }
+    // Если у нас есть объект `data`, рендерим его в HTML
+    return renderPcBuildHtml(data);
 }
 
 /**
@@ -67,7 +81,8 @@ function renderPcBuildHtml(data) {
             const name = product.product_name || 'Компонент';
             const desc = product.product_description || '';
             const spec = product.product_specification || '';
-            const imgUrl = 'https://www.ivory.co.il/files/catalog/org/1722153921d21Qx.webp'; // заглушка
+            // Используем изображение из данных, если оно есть, иначе заглушку
+            const imgUrl = product.component_image || 'https://www.ivory.co.il/files/catalog/org/1722153921d21Qx.webp';
 
             html += `<article class="component">`;
             html += `<h2>${escapeHtml(name)}</h2>`;
@@ -77,7 +92,9 @@ function renderPcBuildHtml(data) {
             html += `<p>${escapeHtml(desc)}</p>`;
 
             if (spec) {
-                html += parseSpecGrid(spec);
+                // ИСПРАВЛЕНО: Спецификации теперь могут быть массивом
+                const specString = Array.isArray(spec) ? spec.join('; ') : spec;
+                html += parseSpecGrid(specString);
             }
 
             html += `</div></div></article>`;
@@ -124,8 +141,8 @@ function escapeHtml(text) {
     if (typeof text !== 'string') return String(text);
     return text
         .replace(/&/g, '&amp;')
-        .replace(/</g, '<')
-        .replace(/>/g, '>')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 }

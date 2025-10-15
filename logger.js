@@ -1,12 +1,4 @@
 // logger.js
-// \file logger.js
-// -*- coding: utf-8 -*-
-
-/**
- * Модуль логирования событий расширения
- * =====================================
- * Класс Logger реализует асинхронное логирование с сохранением в chrome.storage
- */
 
 class Logger {
     constructor(storageKey = '__kazarinov_logs__', maxLogs = 100) {
@@ -36,8 +28,9 @@ class Logger {
                 console.log(`[LOG] [${timestamp}] ${message}`, extraDetails);
         }
 
-
-        this._saveLogEntry(logEntry);
+        if (chrome && chrome.storage && chrome.storage.local) {
+            this._saveLogEntry(logEntry);
+        }
     }
 
     info(message, extra = null) { this.log('info', message, extra); }
@@ -69,5 +62,4 @@ class Logger {
     async clearLogs() { await chrome.storage.local.remove(this.storageKey); }
 }
 
-// Экспорт класса, чтобы экземпляр создавался там, где нужен
-self.Logger = Logger;
+const logger = new Logger();
