@@ -1,82 +1,46 @@
 // json2html.js
 // -*- coding: utf-8 -*-
-/**
- * Парсит JSON-объект и возвращает HTML по заданному шаблону.
- */
 
-/**
- * Основная функция: обрабатывает входные данные и возвращает готовый HTML.
- * @param {string|Object} rawData — строка от Gemini или уже распарсенный JSON-объект.
- * @returns {string} — HTML для вставки в DOM.
- */
-function parseResponseToHtml(rawData) {
+async function parseResponseToHtml(rawData) {
     if (!rawData) {
         return '<p class="error-message">Ошибка: пустой ответ.</p>';
     }
-
     let dataObject;
-
     if (typeof rawData === 'object' && rawData !== null) {
         dataObject = rawData;
     } else if (typeof rawData === 'string') {
-        let cleanedString = rawData.trim();
-        if (cleanedString.startsWith('```')) {
-            cleanedString = cleanedString.substring(cleanedString.indexOf('\n') + 1).replace(/```$/, '').trim();
-        }
+        let cleanedString = rawData.trim().replace(/^```json\s*/i, '').replace(/\s*```\s*$/, '').trim();
         try {
             dataObject = JSON.parse(cleanedString);
         } catch (e) {
             return `<p class="error-message">Ошибка: не удалось обработать данные как JSON. ${e.message}</p>`;
         }
     } else {
-        return `<p class="error-message">Ошибка: неподдерживаемый формат данных (тип: ${typeof rawData}).</p>`;
+        return `<p class="error-message">Ошибка: неподдерживаемый формат данных.</p>`;
     }
-
-    return renderPcBuildHtml(dataObject);
+    return await renderPcBuildHtml(dataObject);
 }
 
-/**
- * Рендерит HTML-сборку ПК из JSON-объекта по заданному шаблону.
- * @param {Object} data — JSON объект.
- * @returns {string} — HTML сборки.
- */
-function renderPcBuildHtml(data) {
+async function renderPcBuildHtml(data) {
     if (typeof data !== 'object' || data === null) {
         return '<p class="error-message">Ошибка: данные для рендеринга не являются объектом.</p>';
     }
 
-    let html = '';
+    let mainContentHtml = '';
 
-    // 1. Название сборки (title) -> H1
     if (data.title) {
-        html += `<h1>${escapeHtml(data.title)}</h1>`;
+        mainContentHtml += `<h1>${escapeHtml(data.title)}</h1>`;
     }
-
-    // 2. description -> div.description
     if (data.description) {
-        html += `<div class="description">${escapeHtml(data.description)}</div>`;
+        mainContentHtml += `<div class="description">${escapeHtml(data.description)}</div>`;
     }
-
-    // 3. Компоненты -> section > article.component
-    // ▼▼▼▼▼ ИЗМЕНЕНИЕ ЗДЕСЬ ▼▼▼▼▼
-    if (Array.isArray(data.components)) { // БЫЛО: data.products
+    if (Array.isArray(data.components)) {
         let componentsHtml = '';
-        data.components.forEach((product, index) => { // БЫЛО: data.products
+        data.components.forEach((product, index) => {
             const name = product.component_name || 'Компонент';
             const desc = product.component_description || '';
-            const spec = product.component_specification || '';
+            const specArray = product.component_specification || [];
             const imgUrl = product.component_image || 'https://via.placeholder.com/180';
-
-            // ИСПРАВЛЕНО: Спецификации теперь могут быть объектом, преобразуем в строку
-            let specString = '';
-            if (typeof spec === 'object' && spec !== null) {
-                specString = Object.entries(spec)
-                    .map(([key, value]) => `${key}: ${value}`)
-                    .join('; ');
-            } else if (spec) {
-                specString = Array.isArray(spec) ? spec.join('; ') : String(spec);
-            }
-
             componentsHtml += `
                 <article class="component" id="component-${index + 1}">
                     <h2>${escapeHtml(name)}</h2>
@@ -84,32 +48,122 @@ function renderPcBuildHtml(data) {
                         <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(name)}">
                         <div class="component-body">
                             <p>${escapeHtml(desc)}</p>
-                            <div class="spec">${escapeHtml(specString)}</div>
+                            ${renderSpecGridFromArray(specArray)}
                         </div>
                     </div>
-                </article>
-            `;
+                </article>`;
         });
-        html += `<section aria-label="Components">${componentsHtml}</section>`;
+        mainContentHtml += `<section aria-label="Components">${componentsHtml}</section>`;
     }
-    // ▲▲▲▲▲ КОНЕЦ ИЗМЕНЕНИЯ ▲▲▲▲▲
 
-    return html;
+    const footerHtml = await generateServiceFooterHtml();
+
+    const priceDisplayValue = data.price ? `${escapeHtml(data.price)} ₪` : '...';
+    const priceDisplayHtml = `
+        <div class="offer-price-display">
+            <strong>Итоговая цена:</strong>
+            <span id="price-display-value">${priceDisplayValue}</span>
+        </div>
+    `;
+
+    // ▼▼▼ ИЗМЕНЕНИЕ ЗДЕСЬ: Поменял местами две кнопки ▼▼▼
+    const priceBlockHtml = `
+        <div class="price-block">
+            <label for="price-input">Цена (₪):</label>
+            <input type="text" id="price-input" placeholder="Введите цену" value="${escapeHtml(data.price || '')}">
+            <button id="save-offer-button">Сохранить предложение</button>
+            <button id="change-image-button">Изменить картинку</button>
+        </div>
+    `;
+
+    return mainContentHtml + footerHtml + priceDisplayHtml + priceBlockHtml;
 }
 
-/**
- * Безопасное экранирование HTML-тегов.
- * @param {string} text — исходный текст.
- * @returns {string} — безопасный HTML.
- */
+async function generateServiceFooterHtml() {
+    try {
+        let locale = 'en';
+        try {
+            const currentLocale = chrome.i18n.getUILanguage();
+            if (currentLocale.startsWith('ru')) locale = 'ru';
+            else if (currentLocale.startsWith('he')) locale = 'he';
+        } catch (ex) {
+            console.warn('Ошибка определения локали для футера, используется "en"', ex);
+        }
+
+        const messageUrl = chrome.runtime.getURL(`_locales/${locale}/footer-message.md`);
+        let textContent = '';
+        try {
+            const response = await fetch(messageUrl);
+            if (!response.ok) {
+                const fallbackUrl = chrome.runtime.getURL('_locales/en/footer-message.md');
+                const fallbackResponse = await fetch(fallbackUrl);
+                if (!fallbackResponse.ok) throw new Error('Не удалось загрузить файл футера.');
+                textContent = await fallbackResponse.text();
+            } else {
+                textContent = await response.text();
+            }
+        } catch (fetchError) {
+            console.error("Ошибка загрузки файла футера:", fetchError);
+            return `<p class="error-message">Не удалось загрузить служебную информацию.</p>`;
+        }
+
+        let htmlContent = textContent.split('\n').map(line => line.trim()).filter(Boolean)
+            .map(line => line.match(/^\d+\.\s*.+/) ? `<h3>${escapeHtml(line)}</h3>` : `<p>${escapeHtml(line)}</p>`)
+            .join('');
+
+        const imageUrl = await getRandomImageUrl();
+
+        return `
+            <footer class="service-footer">
+                <div class="footer-text">${htmlContent}</div>
+                <div class="footer-image"><img id="footer-random-image" src="${imageUrl}" alt="Service Illustration"></div>
+            </footer>`;
+
+    } catch (error) {
+        console.error("Ошибка генерации футера:", error);
+        return `<p class="error-message">Не удалось сгенерировать служебную информацию.</p>`;
+    }
+}
+
+async function getRandomImageUrl() {
+    let imageUrl = 'https://via.placeholder.com/300x200';
+    try {
+        const manifestUrl = chrome.runtime.getURL('image-manifest.json');
+        const manifestResponse = await fetch(manifestUrl);
+        if (!manifestResponse.ok) throw new Error('Не удалось загрузить image-manifest.json');
+        const imageList = await manifestResponse.json();
+
+        if (Array.isArray(imageList) && imageList.length > 0) {
+            const randomImagePath = imageList[Math.floor(Math.random() * imageList.length)];
+            imageUrl = chrome.runtime.getURL(randomImagePath);
+        }
+    } catch (imgError) {
+        console.error("Ошибка загрузки манифеста изображений:", imgError);
+    }
+    return imageUrl;
+}
+
+function renderSpecGridFromArray(specArray) {
+    if (!Array.isArray(specArray) || specArray.length === 0) return '';
+    let gridHtml = '<div class="spec-grid">';
+    specArray.forEach(item => {
+        const colonIndex = item.indexOf(':');
+        if (colonIndex > -1) {
+            const key = item.substring(0, colonIndex).trim();
+            const value = item.substring(colonIndex + 1).trim();
+            gridHtml += `<div>${escapeHtml(key)}</div><div>${escapeHtml(value)}</div>`;
+        } else {
+            gridHtml += `<div class="spec-full-row">${escapeHtml(item)}</div>`;
+        }
+    });
+    gridHtml += '</div>';
+    return gridHtml;
+}
+
 function escapeHtml(text) {
     if (typeof text !== 'string') return String(text);
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 window.parseResponseToHtml = parseResponseToHtml;
+window.getRandomImageUrl = getRandomImageUrl;

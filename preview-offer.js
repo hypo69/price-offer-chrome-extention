@@ -1,17 +1,9 @@
 // preview-offer.js
 
-// Глобальная переменная для хранения текущих данных, которые можно редактировать
 let currentOfferData = null;
 
-/**
- * Основная функция, которая строит весь интерфейс с табами
- * @param {HTMLElement} container - главный контейнер
- * @param {string} offerDataString - исходные данные от Gemini в виде строки
- */
-function displayOfferWithTabs(container, offerDataString) {
-    container.innerHTML = ''; // Очищаем контейнер
-
-    // --- Обработка исходных данных ---
+async function displayOfferWithTabs(container, offerDataString) {
+    container.innerHTML = '';
     let cleanedData = offerDataString.trim().replace(/^```json\s*/i, '').replace(/\s*```\s*$/, '').trim();
     try {
         currentOfferData = JSON.parse(cleanedData);
@@ -21,25 +13,19 @@ function displayOfferWithTabs(container, offerDataString) {
         return;
     }
 
-    // --- Создание элементов интерфейса ---
     const tabControls = document.createElement('div');
     tabControls.className = 'tab-controls';
-
     const htmlViewBtn = document.createElement('button');
     htmlViewBtn.className = 'tab-button active';
     htmlViewBtn.textContent = 'HTML View';
-
     const jsonEditBtn = document.createElement('button');
     jsonEditBtn.className = 'tab-button';
     jsonEditBtn.textContent = 'JSON Edit';
-
     const htmlViewContent = document.createElement('div');
     htmlViewContent.className = 'tab-content active';
-
     const jsonEditContent = document.createElement('div');
     jsonEditContent.className = 'tab-content';
 
-    // --- Логика переключения табов ---
     function switchTab(activeTab) {
         if (activeTab === 'html') {
             htmlViewBtn.classList.add('active');
@@ -57,35 +43,33 @@ function displayOfferWithTabs(container, offerDataString) {
     htmlViewBtn.addEventListener('click', () => switchTab('html'));
     jsonEditBtn.addEventListener('click', () => switchTab('json'));
 
-    // --- Заполнение таба HTML View ---
-    function renderHtmlView() {
+    async function renderHtmlView() {
         try {
-            htmlViewContent.innerHTML = window.parseResponseToHtml(currentOfferData);
+            htmlViewContent.innerHTML = await window.parseResponseToHtml(currentOfferData);
+            // "Оживляем" обе кнопки после каждой перерисовки HTML
+            setupPriceSaveButton();
+            setupChangeImageButton();
         } catch (e) {
             htmlViewContent.innerHTML = `<p class="error-message">Ошибка рендеринга HTML: ${e.message}</p>`;
         }
     }
 
-    // --- Заполнение таба JSON Edit ---
     const jsonEditor = document.createElement('textarea');
     jsonEditor.id = 'json-editor';
     jsonEditor.value = JSON.stringify(currentOfferData, null, 2);
-
     const saveButton = document.createElement('button');
     saveButton.id = 'save-json-button';
     saveButton.textContent = 'Save Changes';
 
-    saveButton.addEventListener('click', () => {
+    saveButton.addEventListener('click', async () => {
         try {
             const newJsonString = jsonEditor.value;
-            currentOfferData = JSON.parse(newJsonString); // Проверяем валидность
-
-            chrome.storage.local.set({
+            currentOfferData = JSON.parse(newJsonString);
+            await chrome.storage.local.set({
                 previewOfferData: newJsonString,
                 lastOffer: newJsonString
             });
-
-            renderHtmlView();
+            await renderHtmlView();
             switchTab('html');
             alert('Изменения сохранены и применены!');
         } catch (e) {
@@ -93,24 +77,77 @@ function displayOfferWithTabs(container, offerDataString) {
         }
     });
 
-    // --- Сборка интерфейса ---
     tabControls.appendChild(htmlViewBtn);
     tabControls.appendChild(jsonEditBtn);
-
     jsonEditContent.appendChild(jsonEditor);
     jsonEditContent.appendChild(saveButton);
-
     container.appendChild(tabControls);
     container.appendChild(htmlViewContent);
     container.appendChild(jsonEditContent);
 
-    renderHtmlView(); // Первоначальная отрисовка HTML
+    await renderHtmlView();
 }
 
+function setupPriceSaveButton() {
+    const saveButton = document.getElementById('save-offer-button');
+    const priceInput = document.getElementById('price-input');
+    const priceDisplay = document.getElementById('price-display-value');
 
-// ============================================================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (ВАШИ РАБОЧИЕ ВЕРСИИ)
-// ============================================================================
+    if (!saveButton || !priceInput || !priceDisplay) {
+        console.error('Элементы для управления ценой не найдены на странице.');
+        return;
+    }
+
+    saveButton.addEventListener('click', async () => {
+        const price = priceInput.value.trim();
+        if (!price) {
+            alert('Пожалуйста, введите цену.');
+            return;
+        }
+
+        currentOfferData.price = price;
+        const updatedOfferString = JSON.stringify(currentOfferData, null, 2);
+
+        try {
+            await chrome.storage.local.set({
+                previewOfferData: updatedOfferString,
+                lastOffer: updatedOfferString
+            });
+
+            priceDisplay.textContent = `${escapeHtml(price)} ₪`;
+
+            const jsonEditor = document.getElementById('json-editor');
+            if (jsonEditor) {
+                jsonEditor.value = updatedOfferString;
+            }
+
+            saveButton.textContent = 'Сохранено!';
+            saveButton.classList.add('saved');
+            setTimeout(() => {
+                saveButton.textContent = 'Сохранить предложение';
+                saveButton.classList.remove('saved');
+            }, 2000);
+
+        } catch (e) {
+            alert('Не удалось сохранить предложение: ' + e.message);
+        }
+    });
+}
+
+function setupChangeImageButton() {
+    const changeButton = document.getElementById('change-image-button');
+    const imageElement = document.getElementById('footer-random-image');
+
+    if (!changeButton || !imageElement) {
+        console.error('Кнопка смены картинки или сама картинка не найдены.');
+        return;
+    }
+
+    changeButton.addEventListener('click', async () => {
+        const newImageUrl = await window.getRandomImageUrl();
+        imageElement.src = newImageUrl;
+    });
+}
 
 function showLoadingState(container) {
     container.innerHTML = '';
@@ -134,9 +171,6 @@ function showLoadingState(container) {
     container.appendChild(loadingWrapper);
 }
 
-/**
- * ИСПРАВЛЕНО: Возвращена ваша оригинальная, CSP-совместимая версия showError
- */
 function showError(container, errorMessage) {
     container.innerHTML = '';
     const errorWrapper = document.createElement('div');
@@ -147,15 +181,10 @@ function showError(container, errorMessage) {
     const errorText = document.createElement('p');
     errorText.textContent = errorMessage;
     errorText.style.cssText = `color: #5f6368; margin: 0; line-height: 1.6;`;
-
-    // Создаем кнопку программно
     const retryButton = document.createElement('button');
     retryButton.textContent = 'Повторить попытку';
     retryButton.style.cssText = `margin-top: 15px; padding: 10px 20px; background-color: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;`;
-
-    // Добавляем обработчик через addEventListener
     retryButton.addEventListener('click', () => window.location.reload());
-
     errorWrapper.appendChild(errorTitle);
     errorWrapper.appendChild(errorText);
     errorWrapper.appendChild(retryButton);
@@ -166,10 +195,6 @@ function escapeHtml(text) {
     if (typeof text !== 'string') return String(text);
     return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
-
-// ============================================================================
-// ИНИЦИАЛИЗАЦИЯ СТРАНИЦЫ
-// ============================================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('componentsContainer');
@@ -182,7 +207,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             const existingOfferData = storageResult.previewOfferData || storageResult.lastOffer;
             if (existingOfferData) {
-                displayOfferWithTabs(container, existingOfferData);
+                await displayOfferWithTabs(container, existingOfferData);
                 return;
             }
         }
@@ -201,19 +226,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         const componentsData = storageResult.componentsForOffer;
         const apiKey = storageResult.geminiApiKey;
         const model = storageResult.geminiModel || 'gemini-2.5-flash';
-
         const pageText = componentsData.map(c => JSON.stringify(c.data, null, 2)).join('\n\n');
-
-        // Используем GeminiAPI, как и было в вашей рабочей логике
         const offerData = await GeminiAPI.getFullPriceOffer(pageText, apiKey, model);
 
         if (!offerData) {
             throw new Error('Получен пустой ответ от модели.');
         }
 
-        await chrome.storage.local.set({ previewOfferData: offerData, lastOffer: offerData });
+        await chrome.storage.local.set({
+            previewOfferData: offerData,
+            lastOffer: offerData
+        });
 
-        displayOfferWithTabs(container, offerData);
+        await displayOfferWithTabs(container, offerData);
 
     } catch (ex) {
         showError(container, `Произошла критическая ошибка: ${ex.message}`);

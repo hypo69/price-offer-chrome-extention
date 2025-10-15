@@ -16,7 +16,7 @@ body {
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
-/* === СТИЛИ ДЛЯ ТАБОВ === */
+/* Стили для табов */
 .tab-controls {
     display: flex;
     border-bottom: 1px solid #ddd;
@@ -31,7 +31,7 @@ body {
     font-size: 16px;
     color: #5f6368;
     border-bottom: 3px solid transparent;
-    margin-bottom: -1px; /* Накладывается на нижнюю границу .tab-controls */
+    margin-bottom: -1px;
 }
 
     .tab-button.active {
@@ -41,14 +41,14 @@ body {
     }
 
 .tab-content {
-    display: none; /* Все вкладки по умолчанию скрыты */
+    display: none;
 }
 
     .tab-content.active {
-        display: block; /* Активная вкладка отображается */
+        display: block;
     }
 
-/* === СТИЛИ ДЛЯ JSON РЕДАКТОРА === */
+/* Стили для JSON редактора */
 #json-editor {
     width: 100%;
     min-height: 500px;
@@ -59,7 +59,7 @@ body {
     font-size: 14px;
     line-height: 1.6;
     resize: vertical;
-    box-sizing: border-box; /* Учитывает padding и border в общей ширине */
+    box-sizing: border-box;
 }
 
 #save-json-button {
@@ -77,11 +77,10 @@ body {
         background-color: #2c8f45;
     }
 
-
-/* === СТИЛИ ДЛЯ HTML ПРЕДСТАВЛЕНИЯ (по вашему шаблону) === */
+/* Стили для HTML представления */
 .offer-title {
     font-size: 2em;
-    margin-bottom: 1em;
+    margin-bottom: 0.5em;
 }
 
 .description {
@@ -127,17 +126,158 @@ body {
     line-height: 1.6;
 }
 
-.spec {
-    font-size: 0.9em;
-    color: #333;
-    background-color: #f9f9f9;
-    padding: 10px;
+/* Стили для сетки спецификаций */
+.spec-grid {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 8px 16px;
+    margin-top: 12px;
+    font-size: 14px;
+    padding: 12px;
+    background: #fbfcfe;
+    border: 1px solid #eef2f8;
     border-radius: 4px;
-    margin-top: 10px;
-    line-height: 1.5;
 }
 
-@media (max-width: 640px) {
+    .spec-grid > div:nth-child(odd) {
+        font-weight: 600;
+        color: #334155;
+    }
+
+    .spec-grid > div:nth-child(even) {
+        color: #475569;
+    }
+
+    .spec-grid .spec-full-row {
+        grid-column: 1 / -1;
+        color: #475569;
+    }
+
+/* Стили для служебного футера */
+.service-footer {
+    margin-top: 50px;
+    padding-top: 30px;
+    border-top: 2px solid #e6e9ee;
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+.footer-text {
+    flex: 2;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #475569;
+}
+
+    .footer-text h3 {
+        font-size: 16px;
+        color: #334155;
+        margin-top: 1.5em;
+        margin-bottom: 0.5em;
+    }
+
+    .footer-text p {
+        margin: 0.5em 0;
+    }
+
+.footer-image {
+    flex: 1;
+    min-width: 200px;
+}
+
+    .footer-image img {
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        object-fit: cover;
+    }
+
+/* Стили для блока ввода цены */
+.price-block {
+    margin-top: 40px;
+    padding: 20px;
+    border: 2px dashed #4285f4;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+    .price-block label {
+        font-size: 18px;
+        font-weight: 600;
+        color: #334155;
+    }
+
+#price-input {
+    padding: 10px;
+    font-size: 18px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    width: 150px;
+    text-align: center;
+}
+
+#save-offer-button {
+    padding: 10px 25px;
+    font-size: 16px;
+    background-color: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+    #save-offer-button:hover {
+        background-color: #3367d6;
+    }
+
+    #save-offer-button.saved {
+        background-color: #34a853;
+    }
+
+/* ▼▼▼ НОВЫЕ СТИЛИ ДЛЯ КНОПКИ СМЕНЫ КАРТИНКИ ▼▼▼ */
+#change-image-button {
+    padding: 10px 25px;
+    font-size: 16px;
+    background-color: #f1f3f4;
+    color: #5f6368;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+    #change-image-button:hover {
+        background-color: #e8eaed;
+    }
+
+/* Стили для отображения цены */
+.offer-price-display {
+    margin: 10px 0 30px 0;
+    padding: 15px 20px;
+    background-color: #e8f0fe;
+    border-left: 5px solid #4285f4;
+    border-radius: 4px;
+    font-size: 22px;
+}
+
+    .offer-price-display strong {
+        color: #334155;
+        margin-right: 10px;
+    }
+
+#price-display-value {
+    font-weight: 700;
+    color: #1e8e3e;
+}
+
+@media (max-width: 768px) {
     .component-row {
         flex-direction: column;
     }
@@ -145,4 +285,8 @@ body {
         .component-row img {
             max-width: 100%;
         }
+
+    .service-footer {
+        flex-direction: column;
+    }
 }

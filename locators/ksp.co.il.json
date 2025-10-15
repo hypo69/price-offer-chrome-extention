@@ -3,9 +3,9 @@
 
 
   "default_image_url": {
-    "attribute": null,
+    "attribute": "src",
     "by": "XPATH",
-    "selector": "(//li[@class = 'slide selected previous'])[1]//img",
+    "selector": "//li[@class='slide selected previous']//div//img",
     "strategy_for_multiple_selectors": "find_first_match",
     "if_list": "first",
     "mandatory": true,

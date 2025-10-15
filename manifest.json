@@ -42,15 +42,12 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "data/products.json",
+        
+        "image-manifest.json",
         "instructions/**/*",
         "locators/**/*",
-        "chat.html",
-        "debug.html",
         "preview-offer.html",
-        "assets/images/**\/*.jpg",
-        "assets/images/**\/*.png",
-        "assets/images/**\/*.webp"
+        "assets/images/**/*"
       ],
       "matches": [ "<all_urls>" ]
     }
