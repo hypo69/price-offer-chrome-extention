@@ -47,7 +47,10 @@
         "locators/**/*",
         "chat.html",
         "debug.html",
-        "preview-offer.html"
+        "preview-offer.html",
+        "assets/images/**\/*.jpg",
+        "assets/images/**\/*.png",
+        "assets/images/**\/*.webp"
       ],
       "matches": [ "<all_urls>" ]
     }

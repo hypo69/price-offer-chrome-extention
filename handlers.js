@@ -1,159 +1,12 @@
 // handlers.js
-/**
- * Обработка формирования предложения из компонентов
- * НОВАЯ ЛОГИКА: Сначала открывается вкладка, затем данные загружаются через AJAX
- */
-async function handleGenerateOffer(tab) {
-    logger.info('═══════════════════════════════════════════════════════', {
-        tabId: tab.id,
-        mutexLocked: previewTabMutex.locked,
-        waitingCount: previewTabMutex.waiting.length
-    });
-    logger.info('Вызов handleGenerateOffer');
-
-    await previewTabMutex.acquire();
-
-    try {
-        logger.info('Загрузка компонентов из storage...');
-        const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
-
-        logger.info('Компоненты загружены из storage', {
-            componentsCount: components.length,
-            components: components
-        });
-
-        if (components.length === 0) {
-            UIManager.showError(tab.id, 'Нет сохраненных компонентов для формирования предложения', 4000, true);
-            logger.warn('Попытка сформировать предложение без компонентов');
-            return;
-        }
-
-        logger.info('Проверка наличия API ключа...');
-        const { geminiApiKey } = await chrome.storage.sync.get('geminiApiKey');
-
-        logger.info('API ключ проверен', {
-            hasApiKey: !!geminiApiKey,
-            keyLength: geminiApiKey?.length || 0,
-            keyPreview: geminiApiKey ? `${geminiApiKey.substring(0, 10)}...` : 'ОТСУТСТВУЕТ'
-        });
-
-        if (!geminiApiKey) {
-            logger.warn('API ключ отсутствует, открываем страницу настроек');
-            chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
-            return;
-        }
-
-        logger.info('Получение модели из настроек...');
-        const { geminiModel = 'gemini-2.5-flash' } = await chrome.storage.sync.get('geminiModel');
-
-        logger.info('Модель получена', { model: geminiModel });
-
-        logger.info('═══════════════════════════════════════════════════════');
-        logger.info('Сохранение данных в storage для preview-offer.html');
-        logger.info('═══════════════════════════════════════════════════════');
-
-        const dataToSave = {
-            componentsForOffer: components,
-            geminiApiKey: geminiApiKey,
-            geminiModel: geminiModel
-        };
-
-        logger.info('Данные для сохранения', {
-            componentsCount: dataToSave.componentsForOffer.length,
-            hasApiKey: !!dataToSave.geminiApiKey,
-            model: dataToSave.geminiModel
-        });
-
-        await chrome.storage.local.set(dataToSave);
-
-        logger.info('✅ Данные сохранены в storage успешно');
-
-        // Проверка сохранения
-        logger.info('Проверка сохраненных данных...');
-        const verification = await chrome.storage.local.get([
-            'componentsForOffer',
-            'geminiApiKey',
-            'geminiModel'
-        ]);
-
-        logger.info('Проверка сохранения:', {
-            hasComponentsForOffer: !!verification.componentsForOffer,
-            componentsCount: verification.componentsForOffer?.length || 0,
-            hasApiKey: !!verification.geminiApiKey,
-            apiKeyLength: verification.geminiApiKey?.length || 0,
-            model: verification.geminiModel
-        });
-
-        logger.info('═══════════════════════════════════════════════════════');
-        logger.info('Открытие/активация вкладки preview-offer.html');
-        logger.info('═══════════════════════════════════════════════════════');
-
-        const previewUrl = chrome.runtime.getURL('preview-offer.html');
-        logger.info('URL вкладки preview-offer', { url: previewUrl });
-
-        const existingTabs = await chrome.tabs.query({ url: previewUrl });
-        logger.info('Поиск существующих вкладок', {
-            foundCount: existingTabs.length,
-            tabs: existingTabs
-        });
-
-        if (existingTabs.length > 0) {
-            const targetTab = existingTabs[0];
-            logger.info('Найдена существующая вкладка, активация', {
-                tabId: targetTab.id,
-                windowId: targetTab.windowId,
-                active: targetTab.active
-            });
-
-            await chrome.tabs.update(targetTab.id, { active: true });
-            await chrome.windows.update(targetTab.windowId, { focused: true });
-
-            logger.info('Перезагрузка вкладки...');
-            await chrome.tabs.reload(targetTab.id);
-
-            logger.info('✅ Вкладка preview-offer обновлена и активирована', { tabId: targetTab.id });
-        } else {
-            logger.info('Создание новой вкладки preview-offer...');
-            const newTab = await chrome.tabs.create({ url: previewUrl, active: true });
-
-            await chrome.storage.local.set({ previewOfferTabId: newTab.id });
-
-            logger.info('✅ Вкладка preview-offer создана', {
-                tabId: newTab.id,
-                windowId: newTab.windowId
-            });
-        }
-
-        logger.info('═══════════════════════════════════════════════════════');
-        logger.info('handleGenerateOffer завершен успешно');
-        logger.info('═══════════════════════════════════════════════════════');
-
-    } catch (ex) {
-        logger.error('═══════════════════════════════════════════════════════');
-        logger.error('❌ Ошибка в handleGenerateOffer', {
-            error: ex.message,
-            stack: ex.stack
-        });
-        logger.error('═══════════════════════════════════════════════════════');
-        UIManager.showError(tab.id, 'Ошибка открытия предложения', 4000, true);
-    } finally {
-        previewTabMutex.release();
-    }
-}// handlers.js
 // \file handlers.js
 // -*- coding: utf-8 -*-
 
 /**
  * Модуль обработчиков действий контекстного меню
  * ==============================================
- * Содержит функции обработки всех действий пользователя через контекстное меню
- * Все функции используют глобальные logger и menuManager из background.js
  */
 
-/**
- * Класс Mutex для предотвращения race conditions
- * Обеспечивает эксклюзивный доступ к критическим секциям кода
- */
 class Mutex {
     constructor() {
         this.locked = false;
@@ -185,14 +38,8 @@ class Mutex {
     }
 }
 
-/**
- * Глобальный мьютекс для операций с preview-offer
- */
 const previewTabMutex = new Mutex();
 
-/**
- * Обработка добавления компонента
- */
 async function handleAddComponent(tab) {
     UIManager.showIndicator(tab.id, 'Извлечение данных...');
     logger.info('Начало извлечения данных по локаторам', { tabId: tab.id });
@@ -253,9 +100,6 @@ async function handleAddComponent(tab) {
     }
 }
 
-/**
- * Обработка удаления компонента
- */
 async function handleDeleteComponent(menuItemId) {
     const componentId = menuItemId.replace('delete-', '');
     logger.info('Запрос на удаление компонента', { componentId });
@@ -271,9 +115,6 @@ async function handleDeleteComponent(menuItemId) {
     }
 }
 
-/**
- * Обработка копирования JSON компонента
- */
 async function handleCopyComponent(menuItemId, tab) {
     try {
         const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
@@ -300,9 +141,6 @@ async function handleCopyComponent(menuItemId, tab) {
     }
 }
 
-/**
- * Обработка загрузки сохраненного предложения
- */
 async function handleLoadOffer(menuItemId, tab) {
     try {
         const { savedOffers = {} } = await chrome.storage.local.get('savedOffers');
@@ -324,7 +162,7 @@ async function handleLoadOffer(menuItemId, tab) {
 
 /**
  * Обработка формирования предложения из компонентов
- * НОВАЯ ЛОГИКА: Сначала открывается вкладка, затем данные загружаются через AJAX
+ * ВАЖНО: Всегда отправляет НОВЫЙ запрос к Gemini API
  */
 async function handleGenerateOffer(tab) {
     logger.info('Вызов handleGenerateOffer', {
@@ -354,12 +192,25 @@ async function handleGenerateOffer(tab) {
         // Получаем модель из настроек
         const { geminiModel = 'gemini-2.5-flash' } = await chrome.storage.sync.get('geminiModel');
 
-        // Сохраняем компоненты в storage для preview-offer.html
+        logger.info('═══════════════════════════════════════════════════════');
+        logger.info('УДАЛЕНИЕ СТАРЫХ ДАННЫХ для нового запроса');
+        logger.info('═══════════════════════════════════════════════════════');
+
+        // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Удаляем старые данные перед открытием вкладки
+        // Это заставит preview-offer.js отправить новый запрос
+        await chrome.storage.local.remove(['previewOfferData', 'lastOffer']);
+
+        logger.info('Старые данные предложения удалены');
+
+        // Сохраняем компоненты и настройки для preview-offer.html
         await chrome.storage.local.set({
             componentsForOffer: components,
             geminiApiKey: geminiApiKey,
-            geminiModel: geminiModel
+            geminiModel: geminiModel,
+            forceNewRequest: true // Флаг принудительного нового запроса
         });
+
+        logger.info('✅ Данные для нового запроса сохранены');
 
         // Открываем или активируем вкладку preview-offer
         const previewUrl = chrome.runtime.getURL('preview-offer.html');
@@ -370,12 +221,16 @@ async function handleGenerateOffer(tab) {
             await chrome.tabs.update(targetTab.id, { active: true });
             await chrome.windows.update(targetTab.windowId, { focused: true });
             await chrome.tabs.reload(targetTab.id);
-            logger.info('Вкладка preview-offer обновлена и активирована', { tabId: targetTab.id });
+            logger.info('✅ Вкладка preview-offer обновлена и активирована (НОВЫЙ ЗАПРОС)', { tabId: targetTab.id });
         } else {
             const newTab = await chrome.tabs.create({ url: previewUrl, active: true });
             await chrome.storage.local.set({ previewOfferTabId: newTab.id });
-            logger.info('Вкладка preview-offer создана', { tabId: newTab.id });
+            logger.info('✅ Вкладка preview-offer создана (НОВЫЙ ЗАПРОС)', { tabId: newTab.id });
         }
+
+        logger.info('═══════════════════════════════════════════════════════');
+        logger.info('handleGenerateOffer завершен - будет отправлен НОВЫЙ запрос');
+        logger.info('═══════════════════════════════════════════════════════');
 
     } catch (ex) {
         logger.error('Ошибка открытия вкладки предложения', { error: ex.message, stack: ex.stack });
@@ -384,7 +239,6 @@ async function handleGenerateOffer(tab) {
         previewTabMutex.release();
     }
 }
-
 
 // Экспорт функций для background.js
 self.handleAddComponent = handleAddComponent;

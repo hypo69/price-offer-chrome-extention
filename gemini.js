@@ -33,9 +33,9 @@ async function loadPriceOfferPrompt() {
         } else if (currentLocale.startsWith('he')) {
             locale = 'he';
         }
-        await logger.debug(`Определена локаль: ${locale}`);
+        logger.debug(`Определена локаль: ${locale}`);
     } catch (ex) {
-        await logger.warn('Ошибка определения локали, используется en по умолчанию', { error: ex.message });
+        logger.warn('Ошибка определения локали, используется en по умолчанию', { error: ex.message });
     }
 
     const tryLoad = async (path) => {
@@ -43,24 +43,24 @@ async function loadPriceOfferPrompt() {
             const url = chrome.runtime.getURL(path);
             const res = await fetch(url);
             if (res.ok) {
-                await logger.debug(`Успешно загружен промпт: ${path}`);
+                logger.debug(`Успешно загружен промпт: ${path}`);
                 return await res.text();
             }
-            await logger.warn(`Не удалось загрузить промпт: ${path} (статус: ${res.status})`);
+            logger.warn(`Не удалось загрузить промпт: ${path} (статус: ${res.status})`);
         } catch (ex) {
-            await logger.warn(`Ошибка загрузки промпта: ${path}`, { error: ex.message });
+            logger.warn(`Ошибка загрузки промпта: ${path}`, { error: ex.message });
         }
         return null;
     };
 
     let promptText = await tryLoad(`instructions/${locale}/price_offer_prompt.txt`);
     if (!promptText) {
-        await logger.info('Загрузка промпта на английском языке как резервный вариант');
+        logger.info('Загрузка промпта на английском языке как резервный вариант');
         promptText = await tryLoad(`instructions/en/price_offer_prompt.txt`);
     }
 
     if (!promptText) {
-        await logger.error('Не удалось загрузить промпт ни для одной локали');
+        logger.error('Не удалось загрузить промпт ни для одной локали');
     }
 
     return promptText;
@@ -94,7 +94,11 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
         const data = await response.json();
 
         if (data.error) {
-            await logger.error('Ошибка Gemini API', { code: data.error.code, message: data.error.message, status: data.error.status });
+            logger.error('Ошибка Gemini API', {
+                code: data.error.code,
+                message: data.error.message,
+                status: data.error.status
+            });
             const error = new Error(data.error.message || 'Неизвестная ошибка Gemini API');
             error.details = data.error;
             throw error;
@@ -102,7 +106,10 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
 
         if (!data.candidates || data.candidates.length === 0) {
             const blockReason = data.promptFeedback?.blockReason || 'Неизвестная причина';
-            await logger.error('Ответ Gemini заблокирован или пуст', { blockReason, promptFeedback: data.promptFeedback });
+            logger.error('Ответ Gemini заблокирован или пуст', {
+                blockReason,
+                promptFeedback: data.promptFeedback
+            });
             const error = new Error(`Ответ от модели заблокирован. Причина: ${blockReason}`);
             error.details = data.promptFeedback || { message: 'Кандидаты отсутствуют в ответе' };
             throw error;
@@ -110,16 +117,22 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
 
         const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!resultText) {
-            await logger.error('Пустой текст в ответе модели', { candidates: data.candidates });
+            logger.error('Пустой текст в ответе модели', { candidates: data.candidates });
             throw new Error('Пустой ответ от модели, хотя кандидаты присутствуют');
         }
 
-        await logger.info('Успешно получен ответ от Gemini API', { responseLength: resultText.length, finishReason: data.candidates[0]?.finishReason });
+        logger.info('Успешно получен ответ от Gemini API', {
+            responseLength: resultText.length,
+            finishReason: data.candidates[0]?.finishReason
+        });
 
         return resultText;
     } catch (ex) {
         if (ex.details) throw ex;
-        await logger.error('Ошибка сетевого запроса к Gemini API', { error: ex.message, stack: ex.stack });
+        logger.error('Ошибка сетевого запроса к Gemini API', {
+            error: ex.message,
+            stack: ex.stack
+        });
         throw new Error(`Ошибка соединения с Gemini API: ${ex.message}`);
     }
 }
@@ -142,18 +155,23 @@ async function _sendRequestToGemini(fullPrompt, apiKey, model) {
  *     Error: При ошибке загрузки промпта или API запроса
  */
 GeminiAPI.getFullPriceOffer = async (pageText, apiKey, model) => {
-    await logger.info('Начало формирования предложения цены', { model, textLength: pageText.length });
+    logger.info('Начало формирования предложения цены', {
+        model,
+        textLength: pageText.length
+    });
 
     const instructions = await loadPriceOfferPrompt();
     if (!instructions) {
-        await logger.error('Не удалось загрузить инструкции для модели');
+        logger.error('Не удалось загрузить инструкции для модели');
         throw new Error('Не удалось загрузить инструкции для модели');
     }
 
     const truncatedText = pageText.substring(0, MAX_PROMPT_LENGTH);
     const fullPrompt = `${instructions}\n\n${truncatedText}`;
 
-    await logger.info('Полный промпт отправляется в Gemini', { fullPrompt });
+    logger.info('Полный промпт отправляется в Gemini', {
+        promptLength: fullPrompt.length
+    });
 
     return await _sendRequestToGemini(fullPrompt, apiKey, model);
 };
@@ -174,29 +192,36 @@ GeminiAPI.getFullPriceOffer = async (pageText, apiKey, model) => {
  *     Error: При ошибке загрузки промпта, API запроса или парсинга JSON
  */
 GeminiAPI.getModelResponseJSON = async (pageText, apiKey, model) => {
-    await logger.info('Запрос полного ответа от модели (JSON)', { model, textLength: pageText.length });
+    logger.info('Запрос полного ответа от модели (JSON)', {
+        model,
+        textLength: pageText.length
+    });
 
     const instructions = await loadPriceOfferPrompt();
     if (!instructions) {
-        await logger.error('Не удалось загрузить инструкции для модели');
+        logger.error('Не удалось загрузить инструкции для модели');
         throw new Error('Не удалось загрузить инструкции для модели');
     }
 
     const truncatedText = pageText.substring(0, MAX_PROMPT_LENGTH);
     const fullPrompt = `${instructions}\n\n${truncatedText}`;
 
-    await logger.info('Промпт отправляется для получения JSON', { fullPrompt });
+    logger.info('Промпт отправляется для получения JSON', {
+        promptLength: fullPrompt.length
+    });
 
     const modelResponse = await _sendRequestToGemini(fullPrompt, apiKey, model);
 
-    await logger.info('Ответ модели получен', { response: modelResponse });
+    logger.info('Ответ модели получен', {
+        responseLength: modelResponse.length
+    });
 
     let parsedJSON = null;
     try {
         parsedJSON = JSON.parse(modelResponse);
-        await logger.info('Ответ модели успешно распарсен как JSON', { parsedJSON });
+        logger.info('Ответ модели успешно распарсен как JSON');
     } catch (ex) {
-        await logger.error('Ошибка парсинга JSON из ответа модели', { error: ex.message });
+        logger.error('Ошибка парсинга JSON из ответа модели', { error: ex.message });
         throw new Error(`Не удалось распарсить ответ модели как JSON: ${ex.message}`);
     }
 
