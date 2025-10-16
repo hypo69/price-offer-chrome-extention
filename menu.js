@@ -2,30 +2,44 @@
 // \file menu.js
 // -*- coding: utf-8 -*-
 
+/**
+ * Модуль для управления контекстным меню расширения
+ * ==================================================
+ * Создание и обновление структуры контекстного меню
+ * ВАЖНО: Обработка кликов по меню происходит в background.js
+ */
+
 class MenuManager {
+    /**
+     * Конфигурация идентификаторов пунктов меню
+     */
     static CONFIG = {
-        GENERATE_OFFER_PARENT_ID: 'generate-offer-parent',
+        GENERATE_OFFER_FROM_COMPONENTS_ID: 'generate-offer-from-components',
         ADD_COMPONENT_ID: 'add-component-action',
-        SAVED_COMPONENTS_PARENT_ID: 'saved-components-parent',
-        CLEAR_ALL_COMPONENTS_ID: 'clear-all-components-action' // НОВЫЙ ID для очистки
+        SAVED_COMPONENTS_PARENT_ID: 'saved-components-parent'
     };
+
+    /**
+     * Ключ хранения компонентов в storage
+     */
     static STORAGE_KEY = 'addedComponents';
 
+    /**
+     * Конструктор менеджера меню
+     * 
+     * Args:
+     *     logger (Logger): Экземпляр логгера для записи событий
+     */
     constructor(logger) {
         this.logger = logger;
-        // Карта для красивых названий языков
-        this.languageNames = {
-            ru: 'на Русском',
-            en: 'in English',
-            he: 'בעברית',
-            it: 'in Italiano',
-            pl: 'po Polsku',
-            uk: 'українською'
-        };
     }
 
+    /**
+     * Инициализация контекстного меню
+     * Функция создает структуру меню с компонентами
+     */
     async initialize() {
-        await chrome.contextMenus.removeAll();
+        chrome.contextMenus.removeAll();
 
         chrome.contextMenus.create({
             id: MenuManager.CONFIG.ADD_COMPONENT_ID,
@@ -34,71 +48,42 @@ class MenuManager {
         });
 
         await this._createSavedComponentsMenu();
+
         await this.logger.info('Контекстное меню инициализировано');
     }
 
+    /**
+     * Создание подменю сохраненных компонентов
+     * Функция загружает компоненты из storage и создает пункты меню
+     */
     async _createSavedComponentsMenu() {
         const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
 
         if (components.length === 0) {
-            // Пункт "Сохраненные компоненты" не создается, если нет ни одного компонента.
-            await this.logger.info('Нет сохраненных компонентов, меню генерации не создано.');
+            await this.logger.info('Нет сохраненных компонентов для отображения в меню');
             return;
         }
 
-        // 1. Создаем родительский пункт для всех сохраненных компонентов
         chrome.contextMenus.create({
             id: MenuManager.CONFIG.SAVED_COMPONENTS_PARENT_ID,
             title: 'Сохраненные компоненты',
             contexts: ['page']
         });
 
-        // 2. Создаем подменю для генерации оффера
         chrome.contextMenus.create({
-            id: MenuManager.CONFIG.GENERATE_OFFER_PARENT_ID,
+            id: MenuManager.CONFIG.GENERATE_OFFER_FROM_COMPONENTS_ID,
             parentId: MenuManager.CONFIG.SAVED_COMPONENTS_PARENT_ID,
             title: 'Сформировать предложение цены',
             contexts: ['page']
         });
 
-        // ▼▼▼ ЛОГИКА ДИНАМИЧЕСКОГО ПОДМЕНЮ ЯЗЫКОВ ▼▼▼
-        try {
-            const manifestUrl = chrome.runtime.getURL('locales-manifest.json');
-            const response = await fetch(manifestUrl);
-            const locales = await response.json();
-
-            if (Array.isArray(locales)) {
-                locales.forEach(locale => {
-                    chrome.contextMenus.create({
-                        id: `generate-offer-lang-${locale}`, // Уникальный ID для каждого языка
-                        parentId: MenuManager.CONFIG.GENERATE_OFFER_PARENT_ID,
-                        title: this.languageNames[locale] || locale, // Используем красивое имя или код языка
-                        contexts: ['page']
-                    });
-                });
-                this.logger.info(`Создано подменю для ${locales.length} языков.`);
-            }
-        } catch (error) {
-            this.logger.error('Не удалось создать подменю языков', { error: error.message });
-            // Создаем запасной пункт меню, если манифест не загрузился
-            chrome.contextMenus.create({
-                id: 'generate-offer-lang-default',
-                parentId: MenuManager.CONFIG.GENERATE_OFFER_PARENT_ID,
-                title: 'По умолчанию',
-                contexts: ['page']
-            });
-        }
-        // ▲▲▲ КОНЕЦ ЛОГИКИ ПОДМЕНЮ ЯЗЫКОВ ▲▲▲
-
-        // 3. Разделитель после подменю генерации
         chrome.contextMenus.create({
-            id: 'components-action-separator-1',
+            id: 'components-action-separator',
             parentId: MenuManager.CONFIG.SAVED_COMPONENTS_PARENT_ID,
             type: 'separator',
             contexts: ['page']
         });
 
-        // 4. Создаем пункты для каждого компонента
         for (const component of components) {
             chrome.contextMenus.create({
                 id: component.id,
@@ -106,7 +91,7 @@ class MenuManager {
                 title: component.name,
                 contexts: ['page']
             });
-            // Добавляем подпункт для удаления компонента
+
             chrome.contextMenus.create({
                 id: `delete-${component.id}`,
                 parentId: component.id,
@@ -115,28 +100,25 @@ class MenuManager {
             });
         }
 
-        // 5. Разделитель перед "Очистить все"
-        chrome.contextMenus.create({
-            id: 'components-action-separator-2',
-            parentId: MenuManager.CONFIG.SAVED_COMPONENTS_PARENT_ID,
-            type: 'separator',
-            contexts: ['page']
-        });
-
-        // 6. ▼▼▼ НОВЫЙ ПУНКТ: Очистить все компоненты (Всегда последний) ▼▼▼
-        chrome.contextMenus.create({
-            id: MenuManager.CONFIG.CLEAR_ALL_COMPONENTS_ID,
-            parentId: MenuManager.CONFIG.SAVED_COMPONENTS_PARENT_ID,
-            title: '💣 Очистить все компоненты', // Броский заголовок для опасного действия
-            contexts: ['page']
-        });
-
         await this.logger.info(`Загружено ${components.length} сохраненных компонентов в меню`);
     }
 
-    async addSavedOfferItem(offerId, offerName) { /* ... без изменений ... */ }
+    /**
+     * Добавление пункта сохраненного предложения
+     * Функция добавляет новое предложение в меню (зарезервировано для будущего использования)
+     * 
+     * Args:
+     *     offerId (string): ID предложения
+     *     offerName (string): Название предложения
+     */
+    async addSavedOfferItem(offerId, offerName) {
+        await this.logger.info(`Пункт меню "${offerName}" зарегистрирован (отображение отключено).`);
+    }
 
-    // Вспомогательный метод для обновления меню
+    /**
+     * Обновление структуры меню
+     * Функция пересоздает меню с актуальными данными
+     */
     async refreshMenu() {
         await this.initialize();
     }

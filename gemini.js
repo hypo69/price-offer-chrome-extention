@@ -7,7 +7,52 @@ const GeminiAPI = {};
 const MAX_PROMPT_LENGTH = 10000;
 
 /**
- * ▼▼▼ ИСПРАВЛЕНО: Функция теперь читает язык из URL-параметра ▼▼▼
+ * Открывает новую вкладку с содержимым промпта для отладки.
+ * @param {string} promptContent Содержимое полного промпта.
+ */
+function _openDebugTab(promptContent) {
+    logger.info('[GEMINI] Открытие отладочной вкладки с промптом.');
+
+    // Эскейпим HTML-теги для безопасного отображения в браузере
+    const escapedContent = promptContent
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br>'); // Заменяем переносы строк на <br>
+
+    // Создаем минимальный HTML-документ
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Gemini Prompt Debug</title>
+            <style>
+                body { white-space: pre-wrap; font-family: monospace; padding: 20px; background-color: #f5f5f5; color: #333; }
+                h1 { color: #cc0000; }
+                .prompt-content { background-color: white; border: 1px solid #ccc; padding: 15px; border-radius: 5px; }
+            </style>
+        </head>
+        <body>
+            <h1>Gemini Full Prompt (DEBUG)</h1>
+            <div class="prompt-content">${escapedContent}</div>
+        </body>
+        </html>
+    `;
+
+    // Создаем data URL
+    const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
+
+    // Открываем новую вкладку с этим data URL
+    chrome.tabs.create({ url: dataUrl })
+        .catch(error => {
+            logger.error('[GEMINI] Ошибка открытия отладочной вкладки:', { error: error.message });
+        });
+}
+
+
+/**
  * Загружает промпт с четкой иерархией приоритетов.
  * @returns {Promise<string|null>} Текст промпта или null при ошибке.
  */
@@ -34,13 +79,18 @@ async function loadPriceOfferPrompt() {
     const defaultLocale = 'ru';
 
     // --- Приоритет 1: Язык из URL-параметра '?lang=...' ---
-    const urlParams = new URLSearchParams(window.location.search);
-    const langFromUrl = urlParams.get('lang');
+    // ВНИМАНИЕ: Предполагается, что этот код выполняется в контексте страницы (например, preview-offer.html),
+    // где window.location.search ссылается на параметры этой страницы.
+    if (typeof window !== 'undefined' && window.location) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const langFromUrl = urlParams.get('lang');
 
-    if (langFromUrl) {
-        logger.info(`[GEMINI] Обнаружен язык в URL: "${langFromUrl}". Попытка загрузки.`);
-        promptText = await tryLoad(langFromUrl);
+        if (langFromUrl) {
+            logger.info(`[GEMINI] Обнаружен язык в URL: "${langFromUrl}". Попытка загрузки.`);
+            promptText = await tryLoad(langFromUrl);
+        }
     }
+
 
     // --- Резервный вариант: Язык по умолчанию ---
     if (!promptText) {
@@ -82,6 +132,11 @@ GeminiAPI.getFullPriceOffer = async (pageText, apiKey, model) => {
     }
     const truncatedText = pageText.substring(0, MAX_PROMPT_LENGTH);
     const fullPrompt = `${instructions}\n\n${truncatedText}`;
+
+    // ▼▼▼ ЛОГИКА ОТЛАДКИ: ОТКРЫТИЕ ВКЛАДКИ С ПРОМПТОМ (ЗАКОММЕНТИРОВАНО) ▼▼▼
+    // _openDebugTab(fullPrompt);
+    // ▲▲▲ КОНЕЦ ЛОГИКИ ОТЛАДКИ ▲▲▲
+
     return await _sendRequestToGemini(fullPrompt, apiKey, model);
 };
 
@@ -94,3 +149,8 @@ GeminiAPI.getModelResponseJSON = async (pageText, apiKey, model) => {
         throw new Error(`Не удалось распарсить ответ модели как JSON: ${ex.message}`);
     }
 };
+
+// Условный экспорт для preview-offer.html
+if (typeof window !== 'undefined') {
+    window.GeminiAPI = GeminiAPI;
+}
