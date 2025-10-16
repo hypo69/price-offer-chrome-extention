@@ -77,12 +77,15 @@ async function renderPcBuildHtml(data) {
 
     let mainContentHtml = '';
 
+    // Заголовок и описание эскейпятся по умолчанию, кроме случая, если вы хотите в них HTML
     if (data.title) {
         mainContentHtml += `<h1>${escapeHtml(data.title)}</h1>`;
     }
+    // Описание эскейпится, но разрешает <br> для переносов
     if (data.description) {
-        mainContentHtml += `<div class="description">${escapeHtml(data.description)}</div>`;
+        mainContentHtml += `<div class="description">${escapeHtmlWithBreaks(data.description)}</div>`;
     }
+
     if (Array.isArray(data.components)) {
         let componentsHtml = '';
         data.components.forEach((product, index) => {
@@ -96,7 +99,7 @@ async function renderPcBuildHtml(data) {
                     <div class="component-row">
                         <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(name)}">
                         <div class="component-body">
-                            <p>${escapeHtml(desc)}</p>
+                            <p>${escapeHtmlWithBreaks(desc)}</p>
                             ${renderSpecGridFromArray(specArray)}
                         </div>
                     </div>
@@ -134,6 +137,10 @@ async function renderPcBuildHtml(data) {
     return mainContentHtml + footerHtml + priceDisplayHtml + priceBlockHtml;
 }
 
+/**
+ * Генерирует HTML для служебного футера из .md файла.
+ * НОВЫЙ КОД: Упрощенный парсинг для поддержки <b>, <hr> и ✅.
+ */
 async function generateServiceFooterHtml() {
     try {
         const defaultLocale = 'ru';
@@ -164,30 +171,40 @@ async function generateServiceFooterHtml() {
             return `<p class="error-message">Не удалось загрузить служебную информацию.</p>`;
         }
 
-        // ▼▼▼ ИСПРАВЛЕНИЕ ЛОГИКИ ПАРСИНГА ФУТЕРА ▼▼▼
-        const lines = textContent.split('\n').map(line => line.trim()).filter(Boolean);
+        // ▼▼▼ ИСПРАВЛЕННАЯ ЛОГИКА ПАРСИНГА ФУТЕРА ▼▼▼
+        const lines = textContent.split('\n');
         let htmlContent = '';
 
         lines.forEach(line => {
-            // Проверяем на наличие тега <b> в начале и </b> в конце
-            // Используем нежадный поиск .*? чтобы убедиться, что он ловит только одну пару <b>
-            const boldMatch = line.match(/^<b>(.*?)<\/b>$/i);
+            const trimmedLine = line.trim();
 
-            if (boldMatch) {
-                // Это заголовок (пункт). Разрешаем HTML (в частности, 🛠️)
-                htmlContent += `<h3>${boldMatch[1]}</h3>`;
-            } else if (line.match(/^(-{3,}|={3,})$/)) {
-                // Горизонтальная линия
+            if (!trimmedLine) {
+                return; // Игнорируем пустые строки
+            }
+
+            // 1. Проверяем на горизонтальную линию (--- или === или много дефисов)
+            if (trimmedLine.match(/^(-{3,}|={3,})$/)) {
                 htmlContent += `<hr>`;
-            } else if (line.match(/^✅\s*.+/)) {
-                // Строка с символом ✅
+            }
+            // 2. Проверяем на строку с ✅
+            else if (trimmedLine.startsWith('✅')) {
+                // Строка с символом ✅ - используем класс для выделения
                 htmlContent += `<p class="footer-highlight">${line}</p>`;
             }
+            // 3. Проверяем на заголовок (<b>...</b>)
+            else if (trimmedLine.startsWith('<b>') && trimmedLine.endsWith('</b>')) {
+                // Заголовок - разрешаем <b> и заключаем в <h3>
+                // Используем line, а не trimmedLine, чтобы сохранить отступы, если они есть
+                const content = line.trim().replace(/^<b>/i, '<h3>').replace(/<\/b>$/i, '</h3>');
+                htmlContent += content;
+            }
             else {
-                // Обычный параграф, эскейпим HTML для безопасности, но разрешаем <br> для переносов
-                htmlContent += `<p>${escapeHtml(line)}</p>`;
+                // Обычный параграф: используем safeHTML (разрешает <br>)
+                htmlContent += `<p>${escapeHtmlWithBreaks(line)}</p>`;
             }
         });
+        // ▲▲▲ КОНЕЦ ИСПРАВЛЕННОЙ ЛОГИКИ ПАРСИНГА ФУТЕРА ▲▲▲
+
 
         const imageUrl = await getRandomImageUrl();
 
@@ -214,8 +231,10 @@ function renderSpecGridFromArray(specArray) {
         if (colonIndex > -1) {
             const key = item.substring(0, colonIndex).trim();
             const value = item.substring(colonIndex + 1).trim();
+            // Спецификации не должны содержать HTML
             gridHtml += `<div>${escapeHtml(key)}</div><div>${escapeHtml(value)}</div>`;
         } else {
+            // Строка спецификации не должна содержать HTML
             gridHtml += `<div class="spec-full-row">${escapeHtml(item)}</div>`;
         }
     });
@@ -241,18 +260,24 @@ async function getRandomImageUrl() {
     return imageUrl;
 }
 
+/**
+ * Базовый эскейп HTML: безопасен, не пропускает теги.
+ */
 function escapeHtml(text) {
     if (typeof text !== 'string') return String(text);
-    // Эскейпим весь HTML по умолчанию
-    let safeText = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
 
-    // Обратное преобразование только для разрешенных тегов (используется только для текста футера)
-    // Разрешаем <b> (для заголовков пунктов в футере)
-    safeText = safeText.replace(/&lt;b&gt;/gi, '<b>').replace(/&lt;\/b&gt;/gi, '</b>');
-
-    // Если нужно разрешить <br> для переносов внутри параграфов, можно добавить:
-    // safeText = safeText.replace(/&lt;br&gt;/gi, '<br>');
-
+/**
+ * Эскейп HTML, разрешающий только <br> для переносов строк.
+ */
+function escapeHtmlWithBreaks(text) {
+    if (typeof text !== 'string') return String(text);
+    // 1. Выполняем полный эскейп
+    let safeText = escapeHtml(text);
+    // 2. Обратно преобразуем <br> (который стал &lt;br&gt;)
+    // Это позволяет безопасно форматировать текст с переносами
+    safeText = safeText.replace(/&lt;br&gt;/gi, '<br>');
     return safeText;
 }
 

@@ -10,9 +10,7 @@
 
 importScripts('logger.js', 'ui-manager.js', 'gemini.js', 'menu.js', 'handlers.js');
 
-// ▼▼▼ ИСПРАВЛЕНИЕ: УДАЛЕНО ДВОЙНОЕ ОБЪЯВЛЕНИЕ logger
-// const logger = new Logger('__kazarinov_logs__', 100);
-
+// logger объявлен в logger.js, здесь просто используем его
 const menuManager = new MenuManager(logger); // Используем logger, объявленный в logger.js
 
 const MenuClickState = {
@@ -96,7 +94,8 @@ async function saveOffer(tabId, result) {
         savedOffers[offerId] = newOffer;
         await chrome.storage.local.set({ savedOffers: savedOffers });
 
-        await menuManager.addSavedOfferItem(offerId, offerName);
+        // ВАЖНО: Обновление меню, чтобы новый пункт появился
+        await menuManager.initialize();
 
         logger.info('Предложение успешно сохранено', {
             offerId: offerId,
@@ -156,23 +155,114 @@ chrome.runtime.onInstalled.addListener(async () => {
     }
 });
 
+
+// ============================================================================
+// НОВЫЕ И МОДИФИЦИРОВАННЫЕ ФУНКЦИИ-ОБРАБОТЧИКИ
+// ============================================================================
+
+/**
+ * ЗАГЛУШКА: Обработчик добавления компонента
+ */
+async function handleAddComponent(tab) {
+    logger.warn(`[BACKGROUND] handleAddComponent: ФУНКЦИЯ-ЗАГЛУШКА. Требуется реализация.`);
+    UIManager.showNotification(tab.id, 'Добавление компонента - в разработке', 3000);
+}
+
+/**
+ * ЗАГЛУШКА: Обработчик удаления одного компонента
+ */
+async function handleDeleteComponent(tab, componentId) {
+    logger.warn(`[BACKGROUND] handleDeleteComponent: ФУНКЦИЯ-ЗАГЛУШКА. Требуется реализация.`);
+    UIManager.showNotification(tab.id, `Удаление ${componentId} - в разработке`, 3000);
+}
+
+/**
+ * ЗАГЛУШКА: Обработчик загрузки оффера в превью
+ */
+async function handleLoadOffer(tab, offerId) {
+    logger.warn(`[BACKGROUND] handleLoadOffer: ФУНКЦИЯ-ЗАГЛУШКА. Требуется реализация.`);
+    UIManager.showNotification(tab.id, `Загрузка ${offerId} - в разработке`, 3000);
+}
+
+/**
+ * ЗАГЛУШКА: Обработчик генерации оффера
+ */
+async function handleGenerateOffer(tab, lang) {
+    logger.warn(`[BACKGROUND] handleGenerateOffer: ФУНКЦИЯ-ЗАГЛУШКА. Требуется реализация.`);
+    UIManager.showNotification(tab.id, `Генерация оффера для ${lang} - в разработке`, 3000);
+}
+
+/**
+ * Обработчик: Удаляет все сохраненные компоненты (ИСПРАВЛЕННЫЙ)
+ */
+async function handleClearAllComponents(tab) {
+    logger.warn(`[BACKGROUND] Очистка всех компонентов по запросу из меню.`);
+
+    // Получаем список, чтобы проверить, есть ли что удалять.
+    const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
+
+    if (components.length === 0) {
+        logger.info('[BACKGROUND] Нет сохраненных компонентов для удаления.');
+        UIManager.showNotification(tab.id, 'Нет компонентов для удаления', 4000);
+        return;
+    }
+
+    try {
+        // --- КРИТИЧЕСКАЯ ЛОГИКА: УДАЛЕНИЕ ---
+        await chrome.storage.local.remove(MenuManager.STORAGE_KEY);
+        logger.info('[BACKGROUND] Все компоненты успешно удалены.');
+        // --- КОНЕЦ КРИТИЧЕСКОЙ ЛОГИКИ ---
+
+        // --- ОБРАБОТКА ПОСЛЕ УДАЛЕНИЯ (обернута в try/catch для изоляции ошибок) ---
+
+        try {
+            // ВАЖНО: Перезапуск меню, чтобы оно удалило все пункты компонентов и исчезло.
+            await menuManager.initialize();
+            logger.info('[BACKGROUND] Контекстное меню успешно перезапущено/обновлено.');
+        } catch (menuError) {
+            logger.error('[BACKGROUND] Ошибка при обновлении меню после удаления:', { error: menuError.message });
+        }
+
+        try {
+            UIManager.reloadPreviewTabs();
+            logger.info('[BACKGROUND] Отправлена команда на обновление превью-вкладок.');
+        } catch (uiError) {
+            logger.error('[BACKGROUND] Ошибка при обновлении UI вкладок:', { error: uiError.message });
+        }
+
+        // Показываем уведомление об успехе
+        UIManager.showNotification(tab.id, 'Все компоненты очищены!', 3000);
+
+    } catch (storageError) {
+        logger.error('[BACKGROUND] КРИТИЧЕСКАЯ ОШИБКА: Ошибка при удалении всех компонентов из storage:', { error: storageError.message });
+        UIManager.showError(tab.id, 'Критическая ошибка очистки хранилища!', 5000, true);
+        throw storageError;
+    }
+}
+
+// ============================================================================
+// ОБРАБОТЧИК КЛИКОВ ПО МЕНЮ (ЗАМЕНА)
+// ============================================================================
+
 /**
  * Обработчик кликов по контекстному меню
  */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const now = Date.now();
     const timeSinceLastClick = now - MenuClickState.lastClickTime;
+    const { menuItemId } = info;
+    const MENU_CONFIG = MenuManager.CONFIG;
 
     logger.debug('Клик по меню', {
-        menuItemId: info.menuItemId,
+        menuItemId: menuItemId,
         timeSinceLastClick: timeSinceLastClick,
         processing: MenuClickState.processing
     });
 
     if (MenuClickState.processing &&
-        info.menuItemId === MenuClickState.lastMenuItemId &&
+        menuItemId === MenuClickState.lastMenuItemId &&
         timeSinceLastClick < DEBOUNCE_TIME) {
-        logger.warn('Клик проигнорирован - debounce активен', { menuItemId: info.menuItemId });
+        logger.warn('Клик проигнорирован - debounce активен', { menuItemId: menuItemId });
         return;
     }
 
@@ -183,7 +273,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
     MenuClickState.processing = true;
     MenuClickState.lastClickTime = now;
-    MenuClickState.lastMenuItemId = info.menuItemId;
+    MenuClickState.lastMenuItemId = menuItemId;
 
     try {
         if (!isTabAccessible(tab)) {
@@ -192,50 +282,47 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             return;
         }
 
-        const menuItemId = info.menuItemId;
-        const MENU_CONFIG = MenuManager.CONFIG;
-
         logger.info('Обработка клика по пункту меню', { menuItemId, tabId: tab.id, url: tab.url });
 
+        let menuHandled = false;
+
+        // 1. Обработка пункта "Добавить компонент"
         if (menuItemId === MENU_CONFIG.ADD_COMPONENT_ID) {
             await handleAddComponent(tab);
-            return;
+            menuHandled = true;
         }
-
-        if (menuItemId.startsWith('delete-component_')) {
-            await handleDeleteComponent(menuItemId);
-            return;
-        }
-
-        if (menuItemId.startsWith('component_')) {
-            await handleCopyComponent(menuItemId, tab);
-            return;
-        }
-
-        if (menuItemId.startsWith('offer_')) {
-            await handleLoadOffer(menuItemId, tab);
-            return;
-        }
-
-        if (menuItemId === MENU_CONFIG.GENERATE_OFFER_FROM_COMPONENTS_ID) {
-            await handleGenerateOfferWithUI(tab);
-            return;
-        }
-
-        // ▼▼▼ ИСПРАВЛЕННАЯ ЛОГИКА ДЛЯ МЕНЮ ЯЗЫКА (после предыдущих итераций) ▼▼▼
-        if (menuItemId.startsWith('generate-offer-lang-')) {
+        // 2. Обработка пунктов генерации оффера по языкам
+        else if (menuItemId.startsWith('generate-offer-lang-')) {
             const lang = menuItemId.split('-').pop();
             await handleGenerateOffer(tab, lang === 'default' ? null : lang);
-            return;
+            menuHandled = true;
+        }
+        // 3. Обработка пункта "Удалить компонент"
+        else if (menuItemId.startsWith('delete-')) {
+            const componentId = menuItemId.substring('delete-'.length);
+            await handleDeleteComponent(tab, componentId);
+            menuHandled = true;
+        }
+        // 4. Обработка НОВОГО ПУНКТА: Очистить все компоненты
+        else if (menuItemId === MENU_CONFIG.CLEAR_ALL_COMPONENTS_ID) {
+            await handleClearAllComponents(tab);
+            menuHandled = true;
+        }
+        // 5. Обработка клика по самому компоненту (загрузка в превью)
+        else if (menuItemId.startsWith('component_')) { // Предполагаем, что ID компонента начинается с 'component_'
+            await handleLoadOffer(tab, menuItemId);
+            menuHandled = true;
         }
 
-        logger.warn('Неизвестный пункт меню', { menuItemId });
+        if (!menuHandled) {
+            logger.warn('Неизвестный пункт меню', { menuItemId });
+        }
 
     } catch (ex) {
         logger.error('Ошибка обработки клика по меню', {
             error: ex.message,
             stack: ex.stack,
-            menuItemId: info.menuItemId,
+            menuItemId: menuItemId,
             tabId: tab?.id
         });
         UIManager.showError(tab.id, 'Ошибка обработки действия', 4000, true);
@@ -246,6 +333,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }, 100);
     }
 });
+
 
 /**
  * Обработчик генерации предложения с UI индикаторами
