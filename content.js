@@ -1,10 +1,10 @@
 // content.js
 
-/
-    * Модуль content script расширения
-        * ================================
+/**
+* Модуль content script расширения
+* ================================
  * Внедряется на все страницы для отображения UI - элементов
-    * /
+*/
 
 if (window.__gemini_content_script_loaded) {
     console.debug('[Content Script] Скрипт уже загружен, прерывание повторной инициализации');
@@ -16,10 +16,10 @@ if (window.__gemini_content_script_loaded) {
 var __geminiIndicator = null;
 var __geminiModal = null;
 
-/
+/**
     * Обработчик сообщений от background script
-        * Получает команды на отображение UI и извлечение данных
-            * /
+    * Получает команды на отображение UI и извлечение данных
+*/
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.debug('[Content Script] Получено сообщение', { action: request.action });
 
@@ -35,10 +35,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
 });
 
-/
+/**
     * Извлечение данных компонента со страницы
-        * Использует executeLocators(глобально подключен через execute - locators.js)
-            * /
+    * Использует executeLocators(глобально подключен через execute - locators.js)
+    */
 async function extractComponent() {
     try {
         const hostname = window.location.hostname.replace(/^www\./, '');
@@ -58,9 +58,9 @@ async function extractComponent() {
     }
 }
 
-/
+/**
     * Отображение модального окна с результатом
-        * /
+        */
 function showSummary(summary) {
     if (__geminiModal) return;
 
