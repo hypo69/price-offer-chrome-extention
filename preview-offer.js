@@ -13,20 +13,41 @@ async function displayOfferWithTabs(container, offerDataString) {
         return;
     }
 
-    const tabControls = document.createElement('div');
-    tabControls.className = 'tab-controls';
-    const htmlViewBtn = document.createElement('button');
-    htmlViewBtn.className = 'tab-button active';
-    htmlViewBtn.textContent = 'HTML View';
-    const jsonEditBtn = document.createElement('button');
-    jsonEditBtn.className = 'tab-button';
-    jsonEditBtn.textContent = 'JSON Edit';
+    // Контейнеры с контентом
     const htmlViewContent = document.createElement('div');
     htmlViewContent.id = 'html-view-content';
     htmlViewContent.className = 'tab-content active';
+
     const jsonEditContent = document.createElement('div');
     jsonEditContent.id = 'json-editor-container';
     jsonEditContent.className = 'tab-content';
+
+    const jsonEditor = document.createElement('textarea');
+    jsonEditor.id = 'json-editor';
+    jsonEditor.value = JSON.stringify(currentOfferData, null, 2);
+
+    const saveJsonButton = document.createElement('button');
+    saveJsonButton.id = 'save-json-button';
+    saveJsonButton.textContent = 'Save Changes';
+
+    jsonEditContent.appendChild(jsonEditor);
+    jsonEditContent.appendChild(saveJsonButton);
+
+    // Переключатели табов
+    const tabControls = document.createElement('div');
+    tabControls.className = 'tab-controls';
+    tabControls.style.cssText = `display: flex; gap: 10px; margin: 10px 0;`;
+
+    const htmlViewBtn = document.createElement('button');
+    htmlViewBtn.className = 'tab-button active';
+    htmlViewBtn.textContent = 'HTML View';
+
+    const jsonEditBtn = document.createElement('button');
+    jsonEditBtn.className = 'tab-button';
+    jsonEditBtn.textContent = 'JSON Edit';
+
+    tabControls.appendChild(htmlViewBtn);
+    tabControls.appendChild(jsonEditBtn);
 
     function switchTab(activeTab) {
         if (activeTab === 'html') {
@@ -45,24 +66,6 @@ async function displayOfferWithTabs(container, offerDataString) {
     htmlViewBtn.addEventListener('click', () => switchTab('html'));
     jsonEditBtn.addEventListener('click', () => switchTab('json'));
 
-    async function renderHtmlView() {
-        try {
-            htmlViewContent.innerHTML = await window.parseResponseToHtml(currentOfferData);
-            setupPriceSaveButton();
-            setupChangeImageButton();
-            setupSavePdfButton();
-        } catch (e) {
-            htmlViewContent.innerHTML = `<p class="error-message">Ошибка рендеринга HTML: ${e.message}</p>`;
-        }
-    }
-
-    const jsonEditor = document.createElement('textarea');
-    jsonEditor.id = 'json-editor';
-    jsonEditor.value = JSON.stringify(currentOfferData, null, 2);
-    const saveJsonButton = document.createElement('button');
-    saveJsonButton.id = 'save-json-button';
-    saveJsonButton.textContent = 'Save Changes';
-
     saveJsonButton.addEventListener('click', async () => {
         try {
             const newJsonString = jsonEditor.value;
@@ -79,13 +82,21 @@ async function displayOfferWithTabs(container, offerDataString) {
         }
     });
 
-    tabControls.appendChild(htmlViewBtn);
-    tabControls.appendChild(jsonEditBtn);
-    jsonEditContent.appendChild(jsonEditor);
-    jsonEditContent.appendChild(saveJsonButton);
-    container.appendChild(tabControls);
+    // Добавляем элементы в нужном порядке
     container.appendChild(htmlViewContent);
     container.appendChild(jsonEditContent);
+    container.appendChild(tabControls);
+
+    async function renderHtmlView() {
+        try {
+            htmlViewContent.innerHTML = await window.parseResponseToHtml(currentOfferData);
+            setupPriceSaveButton();
+            setupChangeImageButton();
+            setupSavePdfButton();
+        } catch (e) {
+            htmlViewContent.innerHTML = `<p class="error-message">Ошибка рендеринга HTML: ${e.message}</p>`;
+        }
+    }
 
     await renderHtmlView();
 }
@@ -95,9 +106,7 @@ function setupPriceSaveButton() {
     const priceInput = document.getElementById('price-input');
     const priceDisplay = document.getElementById('price-display-value');
 
-    if (!saveButton || !priceInput || !priceDisplay) {
-        return;
-    }
+    if (!saveButton || !priceInput || !priceDisplay) return;
 
     saveButton.addEventListener('click', async () => {
         const price = priceInput.value.trim();
@@ -116,9 +125,7 @@ function setupPriceSaveButton() {
             });
             priceDisplay.textContent = `${escapeHtml(price)} ₪`;
             const jsonEditor = document.getElementById('json-editor');
-            if (jsonEditor) {
-                jsonEditor.value = updatedOfferString;
-            }
+            if (jsonEditor) jsonEditor.value = updatedOfferString;
             saveButton.textContent = 'Сохранено!';
             saveButton.classList.add('saved');
             setTimeout(() => {
@@ -135,9 +142,7 @@ function setupChangeImageButton() {
     const changeButton = document.getElementById('change-image-button');
     const imageElement = document.getElementById('footer-random-image');
 
-    if (!changeButton || !imageElement) {
-        return;
-    }
+    if (!changeButton || !imageElement) return;
 
     changeButton.addEventListener('click', async () => {
         const newImageUrl = await window.getRandomImageUrl();
@@ -147,12 +152,8 @@ function setupChangeImageButton() {
 
 function setupSavePdfButton() {
     const pdfButton = document.getElementById('save-pdf-button');
-    if (!pdfButton) {
-        return;
-    }
-    pdfButton.addEventListener('click', () => {
-        window.print();
-    });
+    if (!pdfButton) return;
+    pdfButton.addEventListener('click', () => window.print());
 }
 
 function showLoadingState(container) {
@@ -199,54 +200,59 @@ function showError(container, errorMessage) {
 
 function escapeHtml(text) {
     if (typeof text !== 'string') return String(text);
-    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('componentsContainer');
-
     const rtlLanguages = ['he', 'ar', 'fa', 'ur'];
     const urlParams = new URLSearchParams(window.location.search);
     const lang = urlParams.get('lang');
 
-    if (lang && rtlLanguages.includes(lang)) {
-        container.dir = 'rtl';
-    }
+    if (lang && rtlLanguages.includes(lang)) container.dir = 'rtl';
 
     try {
-        const storageResult = await chrome.storage.local.get(['previewOfferData', 'lastOffer', 'componentsForOffer', 'geminiApiKey', 'geminiModel', 'forceNewRequest']);
+        const storageResult = await chrome.storage.local.get([
+            'previewOfferData', 'lastOffer', 'componentsForOffer', 'geminiApiKey', 'geminiModel', 'forceNewRequest'
+        ]);
         const shouldForceNewRequest = storageResult.forceNewRequest === true;
-        if (shouldForceNewRequest) {
-            await chrome.storage.local.remove('forceNewRequest');
-        } else {
+        if (shouldForceNewRequest) await chrome.storage.local.remove('forceNewRequest');
+        else {
             const existingOfferData = storageResult.previewOfferData || storageResult.lastOffer;
             if (existingOfferData) {
                 await displayOfferWithTabs(container, existingOfferData);
                 return;
             }
         }
+
         showLoadingState(container);
+
         if (!storageResult.componentsForOffer || storageResult.componentsForOffer.length === 0) {
             showError(container, 'Нет компонентов для формирования предложения.');
             return;
         }
+
         if (!storageResult.geminiApiKey) {
             showError(container, 'API ключ не установлен.');
             return;
         }
+
         const componentsData = storageResult.componentsForOffer;
         const apiKey = storageResult.geminiApiKey;
         const model = storageResult.geminiModel || 'gemini-2.5-flash';
         const pageText = componentsData.map(c => JSON.stringify(c.data, null, 2)).join('\n\n');
         const offerData = await GeminiAPI.getFullPriceOffer(pageText, apiKey, model);
-        if (!offerData) {
-            throw new Error('Получен пустой ответ от модели.');
-        }
+
+        if (!offerData) throw new Error('Получен пустой ответ от модели.');
+
         await chrome.storage.local.set({
             previewOfferData: offerData,
             lastOffer: offerData
         });
+
         await displayOfferWithTabs(container, offerData);
+
     } catch (ex) {
         showError(container, `Произошла критическая ошибка: ${ex.message}`);
     }

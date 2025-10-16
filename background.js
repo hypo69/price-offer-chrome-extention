@@ -11,6 +11,7 @@
 importScripts('logger.js', 'ui-manager.js', 'gemini.js', 'menu.js', 'handlers.js');
 
 // logger уже объявлен в logger.js
+// ИЗМЕНЕНИЕ: Удалена строка "const logger = new Logger('__kazarinov_logs__', 100);"
 const menuManager = new MenuManager(logger);
 
 const MenuClickState = {
@@ -260,6 +261,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 async function handleGenerateOffer(tab, lang) {
     logger.info('Запуск генерации предложения с UI', { tabId: tab.id, lang: lang });
 
+    // --- Данные для повтора запроса ---
+    const repeatData = {
+        action: 'generateOffer',
+        tabId: tab.id,
+        lang: lang
+    };
+
     try {
         UIManager.showIndicator(tab.id, 'Собираем компоненты...');
         const components = await getComponentsForOffer();
@@ -303,7 +311,14 @@ async function handleGenerateOffer(tab, lang) {
             tabId: tab.id
         });
         UIManager.hideIndicator(tab.id);
-        UIManager.showError(tab.id, `Ошибка при генерации предложения: ${ex.message}`, 8000, true);
+        // !!! ИЗМЕНЕНИЕ: Передаем true для показа кнопки и объект repeatData
+        UIManager.showError(
+            tab.id,
+            `Ошибка при генерации предложения: ${ex.message}`,
+            10000,
+            true, // showRepeatButton = true
+            repeatData // передаем данные для повтора
+        );
     }
 }
 
@@ -424,6 +439,53 @@ async function getGeminiModel() {
         return 'gemini-2.5-flash';
     }
 }
+
+
+// ============================================================================
+// НОВЫЙ ОБРАБОТЧИК ДЛЯ ПОВТОРНОГО ЗАПРОСА (ОТ CONTENT SCRIPT И PREVIEW)
+// ============================================================================
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // Общая логика повтора для Content Script
+    if (request.action === 'repeatLastAction') {
+        const { action, tabId, lang } = request.data;
+        logger.info(`[BACKGROUND] Получен запрос на повтор действия (от Content Script): ${action}`, { tabId, lang });
+
+        if (action === 'generateOffer') {
+            // tabId используется для создания фиктивного объекта tab, необходимого handleGenerateOffer
+            const fakeTab = { id: tabId };
+            handleGenerateOffer(fakeTab, lang)
+                .then(() => sendResponse({ status: 'ok' }))
+                .catch(error => {
+                    logger.error('Ошибка при повторном запросе:', { error: error.message });
+                    sendResponse({ status: 'error', message: error.message })
+                });
+            return true; // Асинхронный ответ
+        }
+
+        sendResponse({ status: 'error', message: 'Неизвестное действие для повтора' });
+    }
+
+    // Логика повтора для страницы Preview-Offer
+    if (request.action === 'repeatFullGeneration') {
+        const { tabId, lang } = request.data;
+        logger.info(`[BACKGROUND] Получен запрос на повтор полной генерации (от Preview): ${tabId}`, { lang });
+
+        // tabId используется для создания фиктивного объекта tab, необходимого handleGenerateOffer
+        const fakeTab = { id: tabId };
+
+        handleGenerateOffer(fakeTab, lang)
+            .then(() => sendResponse({ status: 'ok' }))
+            .catch(error => {
+                logger.error('Ошибка при повторном запросе (от Preview):', { error: error.message });
+                sendResponse({ status: 'error', message: error.message })
+            });
+        return true; // Асинхронный ответ
+    }
+
+    // Если сообщение не обработано, возвращаем false или ничего
+    return false;
+});
 
 
 // ============================================================================

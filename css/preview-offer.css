@@ -196,7 +196,6 @@ body {
     font-size: 1.1em;
 }
 
-
 .footer-image {
     flex: 1;
     min-width: 200px;
@@ -313,12 +312,11 @@ body {
 }
 
     [dir="rtl"] #componentsContainer {
-        /* Для RTL центрирования Flex-контейнеров, если потребуется */
         align-items: flex-end;
     }
 
     [dir="rtl"] .component-row {
-        flex-direction: row-reverse; /* Меняем порядок картинки и текста */
+        flex-direction: row-reverse;
     }
 
     [dir="rtl"] .offer-price-display {
@@ -336,15 +334,12 @@ body {
     }
 
     [dir="rtl"] .spec-grid {
-        /* Инвертируем порядок колонок. 1fr - слева (ключ), 200px - справа (значение) */
         grid-template-columns: 1fr 200px;
     }
 
         [dir="rtl"] .spec-grid > div {
-            /* В RTL все ячейки Grid должны быть выровнены по правому краю */
             text-align: right;
         }
-
 
 @media (max-width: 768px) {
     .component-row {
@@ -368,10 +363,8 @@ body {
     }
 }
 
-
-/* ▼▼▼ СТИЛИ ДЛЯ ПЕЧАТИ (ВОССТАНОВЛЕННАЯ КАРТИНКА В ФУТЕРЕ) ▼▼▼ */
+/* ▼▼▼ СТИЛИ ДЛЯ ПЕЧАТИ ▼▼▼ */
 @media print {
-    /* Скрываем вкладки и JSON-редактор */
     .tab-controls,
     #json-tab-content,
     #json-editor,
@@ -379,26 +372,22 @@ body {
         display: none !important;
     }
 
-    /* Скрываем блок ввода цены и кнопок (он же .price-block) */
     .price-block {
         display: none !important;
     }
 
-    /* Делаем, чтобы основной контейнер печатался без фона и теней */
     #componentsContainer {
         box-shadow: none !important;
         padding: 0 !important;
         margin: 0 !important;
     }
 
-    /* Обнуляем отступы тела страницы для печати */
     body {
         background-color: white !important;
         padding: 0 !important;
         margin: 0 !important;
     }
 
-    /* Восстановление Grid-форматирования для спецификаций */
     .spec-grid {
         display: grid !important;
         gap: 8px 16px !important;
@@ -407,7 +396,6 @@ body {
         padding: 0 !important;
     }
 
-    /* Восстанавливаем RTL-форматирование для печати */
     [dir="rtl"] .spec-grid {
         grid-template-columns: 1fr 200px !important;
     }
@@ -416,18 +404,15 @@ body {
             text-align: right !important;
         }
 
-    /* Убираем рамки и фоны у компонентов */
     .component {
         border: none !important;
         background: white !important;
         padding: 0 !important;
     }
 
-    /* Убираем рамку у футера при печати */
     .service-footer {
         border-top: none !important;
         padding-top: 10px !important;
-        /* При печати переходим на вертикальное расположение, чтобы картинка не занимала лишнее место */
         flex-direction: column !important;
     }
 
@@ -435,11 +420,10 @@ body {
         flex-direction: column !important;
     }
 
-    /* ВОССТАНОВЛЕНИЕ КАРТИНКИ В ФУТЕРЕ */
     .footer-image {
-        display: block !important; /* Убеждаемся, что она видна */
-        max-width: 250px !important; /* Ограничиваем размер при печати */
-        margin: 10px auto 0 auto !important; /* Центрируем под текстом */
+        display: block !important;
+        max-width: 250px !important;
+        margin: 10px auto 0 auto !important;
     }
 
     .footer-text {

@@ -1,154 +1,91 @@
-// content.js
+// preview-offer.js (или внутри <script> в preview-offer.html)
+// Добавьте эту функцию в свой основной скрипт для страницы превью.
 
 /**
-* Модуль content script расширения
-* ================================
- * Внедряется на все страницы для отображения UI - элементов
-*/
+ * Глобальная функция для отображения ошибки на странице Preview с кнопкой повтора.
+ * 
+ * @param {string} message Сообщение об ошибке.
+ * @param {boolean} showRepeat Показывать ли кнопку "Повторить запрос".
+ * @param {object|null} repeatData Данные для повтора {tabId, lang}.
+ */
+window.showPreviewError = function (message, showRepeat = false, repeatData = null) {
+    const errorContainerId = 'preview-error-notification';
+    let container = document.getElementById(errorContainerId);
 
-if (window.__gemini_content_script_loaded) {
-    console.debug('[Content Script] Скрипт уже загружен, прерывание повторной инициализации');
-} else {
-    window.__gemini_content_script_loaded = true;
-    console.info('[Content Script] Инициализация content script');
-}
-
-var __geminiIndicator = null;
-var __geminiModal = null;
-
-/**
-    * Обработчик сообщений от background script
-    * Получает команды на отображение UI и извлечение данных
-*/
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.debug('[Content Script] Получено сообщение', { action: request.action });
-
-    if (request.action === 'showSummary') {
-        showSummary(request.summary);
-        sendResponse({ success: true });
+    if (!container) {
+        // Создаем контейнер для ошибки (если его нет в HTML)
+        container = document.createElement('div');
+        container.id = errorContainerId;
+        container.style.cssText = `
+            margin: 20px auto; 
+            padding: 15px; 
+            border: 1px solid #db4437; 
+            background: #ffe3e3; 
+            color: #db4437; 
+            border-radius: 8px; 
+            max-width: 800px;
+            text-align: left;
+        `;
+        // Предполагаем, что есть элемент, в который мы его добавим, 
+        // например, тело документа или главный контейнер.
+        document.body.prepend(container);
     }
 
-    if (request.action === 'extractComponent') {
-        extractComponent().then(data => sendResponse({ success: !!data, data }));
-    }
+    container.innerHTML = `<strong>КРИТИЧЕСКАЯ ОШИБКА:</strong> ${message}<div id="preview-repeat-button-container" style="margin-top: 10px;"></div>`;
 
-    return true;
-});
+    if (showRepeat && repeatData) {
+        const repeatContainer = document.getElementById('preview-repeat-button-container');
+        const repeatButton = document.createElement('button');
+
+        repeatButton.textContent = 'Повторить запрос'; // ИЗМЕНЕНО
+        repeatButton.style.cssText = `
+            padding: 8px 15px; 
+            background-color: #db4437; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        `;
+
+        repeatButton.onclick = () => {
+            container.innerHTML = 'Повтор запроса...';
+            // Вызываем функцию, которая повторит весь цикл генерации
+            handleRepeatGeneration(repeatData.tabId, repeatData.lang);
+        };
+
+        repeatContainer.appendChild(repeatButton);
+    }
+};
 
 /**
-    * Извлечение данных компонента со страницы
-    * Использует executeLocators(глобально подключен через execute - locators.js)
-    */
-async function extractComponent() {
+ * Имитация функции handleGenerateOffer для повтора запроса с preview-offer.
+ * 
+ * ВНИМАНИЕ: Эта функция должна находиться в том же скрипте, что и GeminiAPI,
+ * и должна иметь доступ к logger.
+ * 
+ * @param {number} tabId ID вкладки, откуда был инициирован запрос (для UI).
+ * @param {string} lang Код языка.
+ */
+async function handleRepeatGeneration(tabId, lang) {
+    // Отправляем сообщение в Service Worker (background.js)
     try {
-        const hostname = window.location.hostname.replace(/^www\./, '');
-        const locatorsPath = chrome.runtime.getURL(`locators/${hostname}.json`);
-        const response = await fetch(locatorsPath);
-        if (!response.ok) throw new Error(`Locators not found for ${hostname}`);
-        const locators = await response.json();
+        const response = await chrome.runtime.sendMessage({
+            action: 'repeatFullGeneration',
+            data: { tabId, lang }
+        });
 
-        const result = executeLocators(locators);
-
-        chrome.runtime.sendMessage({ action: 'componentExtracted', data: result, url: window.location.href });
-        return result;
-    } catch (err) {
-        console.error('[Content Script] Ошибка извлечения компонента:', err);
-        chrome.runtime.sendMessage({ action: 'componentExtracted', error: err.message, url: window.location.href });
-        return null;
+        if (response.status === 'ok') {
+            // Если background.js успешно запустил, он обновит эту вкладку.
+            console.log('Повторная генерация инициирована Service Worker.');
+            showPreviewError('Повторный запрос отправлен. Ожидайте обновления.', false);
+        } else {
+            // Если Service Worker вернул ошибку
+            showPreviewError(`Ошибка при повторном инициировании: ${response.message}`, true, { tabId, lang });
+        }
+    } catch (error) {
+        // Если Service Worker недоступен
+        showPreviewError(`Не удалось связаться с Service Worker для повтора: ${error.message}`, true, { tabId, lang });
     }
 }
-
-/**
-    * Отображение модального окна с результатом
-        */
-function showSummary(summary) {
-    if (__geminiModal) return;
-
-    const overlay = document.createElement('div');
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0,0,0,0.6);
-        z-index: 2147483646;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 20px;
-        font-family: system-ui, -apple-system, sans-serif;
-    `;
-
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-        background: white;
-        border-radius: 12px;
-        width: 100%;
-        max-width: 700px;
-        max-height: 85vh;
-        padding: 24px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        overflow: auto;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        position: relative;
-    `;
-
-    const contentWrapper = document.createElement('pre');
-    contentWrapper.style.cssText = `
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-size: 13px;
-        line-height: 1.6;
-        color: #333;
-        font-family: 'Courier New', monospace;
-    `;
-    contentWrapper.textContent = summary;
-
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '×';
-    closeBtn.style.cssText = `
-        position: absolute;
-        top: 12px;
-        right: 15px;
-        background: #f1f3f4;
-        border: none;
-        font-size: 28px;
-        line-height: 1;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        cursor: pointer;
-        color: #5f6368;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-    `;
-
-    closeBtn.onmouseover = () => { closeBtn.style.background = '#e8eaed'; closeBtn.style.color = '#202124'; };
-    closeBtn.onmouseout = () => { closeBtn.style.background = '#f1f3f4'; closeBtn.style.color = '#5f6368'; };
-
-    const closeModal = () => {
-        if (__geminiModal && __geminiModal.parentNode) {
-            __geminiModal.parentNode.removeChild(__geminiModal);
-            __geminiModal = null;
-        }
-    };
-    closeBtn.onclick = closeModal;
-
-    modal.appendChild(closeBtn);
-    modal.appendChild(contentWrapper);
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-
-    __geminiModal = overlay;
-
-    overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
-
-    const handleEscape = (e) => { if (e.key === 'Escape') { closeModal(); document.removeEventListener('keydown', handleEscape); } };
-    document.addEventListener('keydown', handleEscape);
-}
-
-console.info('[Content Script] Content script полностью загружен и готов к работе');
