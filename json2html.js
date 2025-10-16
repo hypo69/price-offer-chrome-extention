@@ -66,7 +66,6 @@ async function renderPcBuildHtml(data) {
         </div>
     `;
 
-    // ▼▼▼ ИЗМЕНЕНИЕ ЗДЕСЬ: Поменял местами две кнопки ▼▼▼
     const priceBlockHtml = `
         <div class="price-block">
             <label for="price-input">Цена (₪):</label>
@@ -81,29 +80,30 @@ async function renderPcBuildHtml(data) {
 
 async function generateServiceFooterHtml() {
     try {
-        let locale = 'en';
-        try {
-            const currentLocale = chrome.i18n.getUILanguage();
-            if (currentLocale.startsWith('ru')) locale = 'ru';
-            else if (currentLocale.startsWith('he')) locale = 'he';
-        } catch (ex) {
-            console.warn('Ошибка определения локали для футера, используется "en"', ex);
+        const defaultLocale = 'ru';
+        let locale = defaultLocale;
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const langFromUrl = urlParams.get('lang');
+
+        if (langFromUrl) {
+            locale = langFromUrl;
         }
 
         const messageUrl = chrome.runtime.getURL(`_locales/${locale}/footer-message.md`);
         let textContent = '';
         try {
             const response = await fetch(messageUrl);
-            if (!response.ok) {
-                const fallbackUrl = chrome.runtime.getURL('_locales/en/footer-message.md');
+            if (response.ok) {
+                textContent = await response.text();
+            } else {
+                const fallbackUrl = chrome.runtime.getURL(`_locales/${defaultLocale}/footer-message.md`);
                 const fallbackResponse = await fetch(fallbackUrl);
                 if (!fallbackResponse.ok) throw new Error('Не удалось загрузить файл футера.');
                 textContent = await fallbackResponse.text();
-            } else {
-                textContent = await response.text();
             }
         } catch (fetchError) {
-            console.error("Ошибка загрузки файла футера:", fetchError);
+            console.error("Критическая ошибка загрузки файла футера:", fetchError);
             return `<p class="error-message">Не удалось загрузить служебную информацию.</p>`;
         }
 
@@ -125,6 +125,26 @@ async function generateServiceFooterHtml() {
     }
 }
 
+/**
+ * ▼▼▼ ИСПРАВЛЕНИЕ: Удалены атрибуты dir="auto", так как CSS Grid и dir="rtl" делают все за нас. ▼▼▼
+ */
+function renderSpecGridFromArray(specArray) {
+    if (!Array.isArray(specArray) || specArray.length === 0) return '';
+    let gridHtml = '<div class="spec-grid">';
+    specArray.forEach(item => {
+        const colonIndex = item.indexOf(':');
+        if (colonIndex > -1) {
+            const key = item.substring(0, colonIndex).trim();
+            const value = item.substring(colonIndex + 1).trim();
+            gridHtml += `<div>${escapeHtml(key)}</div><div>${escapeHtml(value)}</div>`;
+        } else {
+            gridHtml += `<div class="spec-full-row">${escapeHtml(item)}</div>`;
+        }
+    });
+    gridHtml += '</div>';
+    return gridHtml;
+}
+
 async function getRandomImageUrl() {
     let imageUrl = 'https://via.placeholder.com/300x200';
     try {
@@ -141,23 +161,6 @@ async function getRandomImageUrl() {
         console.error("Ошибка загрузки манифеста изображений:", imgError);
     }
     return imageUrl;
-}
-
-function renderSpecGridFromArray(specArray) {
-    if (!Array.isArray(specArray) || specArray.length === 0) return '';
-    let gridHtml = '<div class="spec-grid">';
-    specArray.forEach(item => {
-        const colonIndex = item.indexOf(':');
-        if (colonIndex > -1) {
-            const key = item.substring(0, colonIndex).trim();
-            const value = item.substring(colonIndex + 1).trim();
-            gridHtml += `<div>${escapeHtml(key)}</div><div>${escapeHtml(value)}</div>`;
-        } else {
-            gridHtml += `<div class="spec-full-row">${escapeHtml(item)}</div>`;
-        }
-    });
-    gridHtml += '</div>';
-    return gridHtml;
 }
 
 function escapeHtml(text) {

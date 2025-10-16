@@ -22,8 +22,10 @@ async function displayOfferWithTabs(container, offerDataString) {
     jsonEditBtn.className = 'tab-button';
     jsonEditBtn.textContent = 'JSON Edit';
     const htmlViewContent = document.createElement('div');
+    htmlViewContent.id = 'html-view-content';
     htmlViewContent.className = 'tab-content active';
     const jsonEditContent = document.createElement('div');
+    jsonEditContent.id = 'json-editor-container';
     jsonEditContent.className = 'tab-content';
 
     function switchTab(activeTab) {
@@ -46,9 +48,9 @@ async function displayOfferWithTabs(container, offerDataString) {
     async function renderHtmlView() {
         try {
             htmlViewContent.innerHTML = await window.parseResponseToHtml(currentOfferData);
-            // "Оживляем" обе кнопки после каждой перерисовки HTML
             setupPriceSaveButton();
             setupChangeImageButton();
+            setupSavePdfButton();
         } catch (e) {
             htmlViewContent.innerHTML = `<p class="error-message">Ошибка рендеринга HTML: ${e.message}</p>`;
         }
@@ -57,11 +59,11 @@ async function displayOfferWithTabs(container, offerDataString) {
     const jsonEditor = document.createElement('textarea');
     jsonEditor.id = 'json-editor';
     jsonEditor.value = JSON.stringify(currentOfferData, null, 2);
-    const saveButton = document.createElement('button');
-    saveButton.id = 'save-json-button';
-    saveButton.textContent = 'Save Changes';
+    const saveJsonButton = document.createElement('button');
+    saveJsonButton.id = 'save-json-button';
+    saveJsonButton.textContent = 'Save Changes';
 
-    saveButton.addEventListener('click', async () => {
+    saveJsonButton.addEventListener('click', async () => {
         try {
             const newJsonString = jsonEditor.value;
             currentOfferData = JSON.parse(newJsonString);
@@ -80,7 +82,7 @@ async function displayOfferWithTabs(container, offerDataString) {
     tabControls.appendChild(htmlViewBtn);
     tabControls.appendChild(jsonEditBtn);
     jsonEditContent.appendChild(jsonEditor);
-    jsonEditContent.appendChild(saveButton);
+    jsonEditContent.appendChild(saveJsonButton);
     container.appendChild(tabControls);
     container.appendChild(htmlViewContent);
     container.appendChild(jsonEditContent);
@@ -94,7 +96,6 @@ function setupPriceSaveButton() {
     const priceDisplay = document.getElementById('price-display-value');
 
     if (!saveButton || !priceInput || !priceDisplay) {
-        console.error('Элементы для управления ценой не найдены на странице.');
         return;
     }
 
@@ -113,23 +114,19 @@ function setupPriceSaveButton() {
                 previewOfferData: updatedOfferString,
                 lastOffer: updatedOfferString
             });
-
             priceDisplay.textContent = `${escapeHtml(price)} ₪`;
-
             const jsonEditor = document.getElementById('json-editor');
             if (jsonEditor) {
                 jsonEditor.value = updatedOfferString;
             }
-
             saveButton.textContent = 'Сохранено!';
             saveButton.classList.add('saved');
             setTimeout(() => {
                 saveButton.textContent = 'Сохранить предложение';
                 saveButton.classList.remove('saved');
             }, 2000);
-
         } catch (e) {
-            alert('Не удалось сохранить предложение: ' + e.message);
+            alert('Не удалось сохранить предложение. ' + e.message);
         }
     });
 }
@@ -139,13 +136,22 @@ function setupChangeImageButton() {
     const imageElement = document.getElementById('footer-random-image');
 
     if (!changeButton || !imageElement) {
-        console.error('Кнопка смены картинки или сама картинка не найдены.');
         return;
     }
 
     changeButton.addEventListener('click', async () => {
         const newImageUrl = await window.getRandomImageUrl();
         imageElement.src = newImageUrl;
+    });
+}
+
+function setupSavePdfButton() {
+    const pdfButton = document.getElementById('save-pdf-button');
+    if (!pdfButton) {
+        return;
+    }
+    pdfButton.addEventListener('click', () => {
+        window.print();
     });
 }
 
@@ -198,10 +204,18 @@ function escapeHtml(text) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('componentsContainer');
+
+    const rtlLanguages = ['he', 'ar', 'fa', 'ur'];
+    const urlParams = new URLSearchParams(window.location.search);
+    const lang = urlParams.get('lang');
+
+    if (lang && rtlLanguages.includes(lang)) {
+        container.dir = 'rtl';
+    }
+
     try {
         const storageResult = await chrome.storage.local.get(['previewOfferData', 'lastOffer', 'componentsForOffer', 'geminiApiKey', 'geminiModel', 'forceNewRequest']);
         const shouldForceNewRequest = storageResult.forceNewRequest === true;
-
         if (shouldForceNewRequest) {
             await chrome.storage.local.remove('forceNewRequest');
         } else {
@@ -211,9 +225,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
         }
-
         showLoadingState(container);
-
         if (!storageResult.componentsForOffer || storageResult.componentsForOffer.length === 0) {
             showError(container, 'Нет компонентов для формирования предложения.');
             return;
@@ -222,24 +234,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             showError(container, 'API ключ не установлен.');
             return;
         }
-
         const componentsData = storageResult.componentsForOffer;
         const apiKey = storageResult.geminiApiKey;
         const model = storageResult.geminiModel || 'gemini-2.5-flash';
         const pageText = componentsData.map(c => JSON.stringify(c.data, null, 2)).join('\n\n');
         const offerData = await GeminiAPI.getFullPriceOffer(pageText, apiKey, model);
-
         if (!offerData) {
             throw new Error('Получен пустой ответ от модели.');
         }
-
         await chrome.storage.local.set({
             previewOfferData: offerData,
             lastOffer: offerData
         });
-
         await displayOfferWithTabs(container, offerData);
-
     } catch (ex) {
         showError(container, `Произошла критическая ошибка: ${ex.message}`);
     }

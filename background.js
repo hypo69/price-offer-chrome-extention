@@ -1,8 +1,20 @@
 // background.js
+// \file background.js
+// -*- coding: utf-8 -*-
+
+/**
+ * Модуль фоновой службы расширения
+ * =================================
+ * Оркестрация событий и управление основной логикой расширения
+ */
 
 importScripts('logger.js', 'ui-manager.js', 'gemini.js', 'menu.js', 'handlers.js');
 
-const menuManager = new MenuManager(logger);
+// ▼▼▼ ИЗМЕНЕНИЕ ЗДЕСЬ ▼▼▼
+// Строка `const logger = new Logger(...)` была полностью УДАЛЕНА.
+// Теперь мы используем объект `logger`, который был создан внутри logger.js
+
+const menuManager = new MenuManager(logger); // Эта строка теперь работает правильно
 
 const MenuClickState = {
     lastClickTime: 0,
@@ -146,10 +158,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             return;
         }
 
-        if (menuItemId === MENU_CONFIG.GENERATE_OFFER_FROM_COMPONENTS_ID) {
-            await handleGenerateOffer(tab);
+        if (menuItemId.startsWith('generate-offer-lang-')) {
+            const lang = menuItemId.split('-').pop();
+            await handleGenerateOffer(tab, lang === 'default' ? null : lang);
             return;
         }
+
     } catch (ex) {
         logger.error('Ошибка обработки клика по меню', {
             error: ex.message,
@@ -164,25 +178,41 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 });
 
+
+/**
+ * Отладочные функции для диагностики
+ */
 self.checkPreviewTabs = async function () {
     const previewUrl = chrome.runtime.getURL('preview-offer.html');
     const tabs = await chrome.tabs.query({ url: previewUrl });
+
     logger.debug('=== ПРОВЕРКА ВКЛАДОК PREVIEW-OFFER ===');
     logger.debug(`Найдено вкладок: ${tabs.length}`);
+
     if (tabs.length > 0) {
         logger.debug('Список вкладок:');
         tabs.forEach((tab, index) => {
             logger.debug(`  ${index + 1}. Tab ID: ${tab.id}, Window ID: ${tab.windowId}, Active: ${tab.active}`);
         });
     }
+
     return tabs;
 };
 
 self.checkState = function () {
     logger.debug('=== ПРОВЕРКА СОСТОЯНИЯ ===');
-    logger.debug('MenuClickState:', { processing: MenuClickState.processing, lastClickTime: MenuClickState.lastClickTime, lastMenuItemId: MenuClickState.lastMenuItemId, timeSinceLastClick: Date.now() - MenuClickState.lastClickTime });
+    logger.debug('MenuClickState:', {
+        processing: MenuClickState.processing,
+        lastClickTime: MenuClickState.lastClickTime,
+        lastMenuItemId: MenuClickState.lastMenuItemId,
+        timeSinceLastClick: Date.now() - MenuClickState.lastClickTime
+    });
+
     if (typeof previewTabMutex !== 'undefined') {
-        logger.debug('previewTabMutex:', { locked: previewTabMutex.locked, waitingCount: previewTabMutex.waiting.length });
+        logger.debug('previewTabMutex:', {
+            locked: previewTabMutex.locked,
+            waitingCount: previewTabMutex.waiting.length
+        });
     } else {
         logger.debug('previewTabMutex: НЕ ОПРЕДЕЛЕН (проверьте handlers.js)');
     }
@@ -190,15 +220,19 @@ self.checkState = function () {
 
 self.closeAllPreviewTabs = async function () {
     const tabs = await self.checkPreviewTabs();
+
     if (tabs.length <= 1) {
         logger.debug('Дублирующих вкладок не найдено');
         return;
     }
+
     logger.debug(`Закрытие ${tabs.length - 1} дублирующих вкладок...`);
+
     for (let i = 1; i < tabs.length; i++) {
         await chrome.tabs.remove(tabs[i].id);
         logger.debug(`Закрыта вкладка ${tabs[i].id}`);
     }
+
     logger.debug('Все дублирующие вкладки закрыты');
 };
 
@@ -206,16 +240,25 @@ self.fullDiagnostic = async function () {
     logger.debug('\n╔════════════════════════════════════════════╗');
     logger.debug('║   ПОЛНАЯ ДИАГНОСТИКА РАСШИРЕНИЯ           ║');
     logger.debug('╚════════════════════════════════════════════╝\n');
+
     await self.checkPreviewTabs();
     logger.debug('');
     self.checkState();
     logger.debug('');
-    const storage = await chrome.storage.local.get(['addedComponents', 'componentsForOffer', 'previewOfferTabId', 'previewOfferData']);
+
+    const storage = await chrome.storage.local.get([
+        'addedComponents',
+        'componentsForOffer',
+        'previewOfferTabId',
+        'previewOfferData'
+    ]);
+
     logger.debug('=== ПРОВЕРКА STORAGE ===');
     logger.debug('addedComponents:', storage.addedComponents?.length || 0);
     logger.debug('componentsForOffer:', storage.componentsForOffer?.length || 0);
     logger.debug('previewOfferTabId:', storage.previewOfferTabId);
     logger.debug('previewOfferData:', storage.previewOfferData ? 'присутствует' : 'отсутствует');
+
     logger.debug('\n╔════════════════════════════════════════════╗');
     logger.debug('║   ДИАГНОСТИКА ЗАВЕРШЕНА                   ║');
     logger.debug('╚════════════════════════════════════════════╝\n');
@@ -223,10 +266,12 @@ self.fullDiagnostic = async function () {
 
 self.resetAllFlags = function () {
     logger.debug('Принудительный сброс всех флагов...');
+
     MenuClickState.processing = false;
     MenuClickState.lastClickTime = 0;
     MenuClickState.lastMenuItemId = null;
     logger.debug('✓ MenuClickState сброшен');
+
     if (typeof previewTabMutex !== 'undefined') {
         previewTabMutex.locked = false;
         previewTabMutex.waiting = [];
@@ -234,6 +279,7 @@ self.resetAllFlags = function () {
     } else {
         logger.debug('⚠ previewTabMutex не определен');
     }
+
     logger.debug('Все флаги сброшены');
 };
 

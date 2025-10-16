@@ -9,7 +9,7 @@ body {
 
 #componentsContainer {
     max-width: 1200px;
-    margin: 0 auto;
+    margin: 0 auto; /* Установит контейнер по центру */
     background: white;
     padding: 30px;
     border-radius: 8px;
@@ -104,6 +104,7 @@ body {
         margin-top: 0;
     }
 
+/* ▼▼▼ ИСПРАВЛЕНИЕ: ЖЕСТКО ЗАДАЕМ ШИРИНУ БЛОКОВ В КОМПОНЕНТАХ ▼▼▼ */
 .component-row {
     display: flex;
     gap: 16px;
@@ -112,19 +113,24 @@ body {
 }
 
     .component-row img {
-        max-width: 180px;
-        width: 100%;
+        width: 180px; /* Фиксированная ширина для стабильности макета */
         height: auto;
         object-fit: contain;
         border-radius: 4px;
         border: 1px solid #ddd;
         background: #fff;
+        flex-shrink: 0; /* Не даем картинке сжиматься */
     }
 
-.component-body p {
-    margin: 6px 0;
-    line-height: 1.6;
+.component-body {
+    flex-grow: 1; /* Разрешаем телу компонента занимать все оставшееся место */
+    width: 100%; /* Гарантирует, что блок занимает место, даже если нет картинки */
 }
+
+    .component-body p {
+        margin: 6px 0;
+        line-height: 1.6;
+    }
 
 /* Стили для сетки спецификаций */
 .spec-grid {
@@ -193,7 +199,7 @@ body {
         object-fit: cover;
     }
 
-/* Стили для блока ввода цены */
+/* Стили для блока ввода/сохранения цены */
 .price-block {
     margin-top: 40px;
     padding: 20px;
@@ -241,7 +247,6 @@ body {
         background-color: #34a853;
     }
 
-/* ▼▼▼ НОВЫЕ СТИЛИ ДЛЯ КНОПКИ СМЕНЫ КАРТИНКИ ▼▼▼ */
 #change-image-button {
     padding: 10px 25px;
     font-size: 16px;
@@ -257,9 +262,24 @@ body {
         background-color: #e8eaed;
     }
 
+#save-pdf-button {
+    padding: 10px 25px;
+    font-size: 16px;
+    background-color: #34a853;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+    #save-pdf-button:hover {
+        background-color: #2c8f45;
+    }
+
 /* Стили для отображения цены */
 .offer-price-display {
-    margin: 10px 0 30px 0;
+    margin-top: 40px;
     padding: 15px 20px;
     background-color: #e8f0fe;
     border-left: 5px solid #4285f4;
@@ -277,6 +297,45 @@ body {
     color: #1e8e3e;
 }
 
+/* ▼▼▼ ИСПРАВЛЕННЫЕ СТИЛИ ДЛЯ RTL (Справа налево) - ВЫРАВНИВАНИЕ ВСЕХ БЛОКОВ СПРАВА ▼▼▼ */
+[dir="rtl"] {
+    text-align: right;
+}
+
+    [dir="rtl"] #componentsContainer {
+        /* Для RTL центрирования Flex-контейнеров, если потребуется */
+        align-items: flex-end;
+    }
+
+    [dir="rtl"] .component-row {
+        flex-direction: row-reverse; /* Меняем порядок картинки и текста */
+    }
+
+    [dir="rtl"] .offer-price-display {
+        border-left: none;
+        border-right: 5px solid #4285f4;
+    }
+
+        [dir="rtl"] .offer-price-display strong {
+            margin-right: 0;
+            margin-left: 10px;
+        }
+
+    [dir="rtl"] .service-footer {
+        flex-direction: row-reverse;
+    }
+
+    [dir="rtl"] .spec-grid {
+        /* Инвертируем порядок колонок. 1fr - слева (ключ), 200px - справа (значение) */
+        grid-template-columns: 1fr 200px;
+    }
+
+        [dir="rtl"] .spec-grid > div {
+            /* В RTL все ячейки Grid должны быть выровнены по правому краю */
+            text-align: right;
+        }
+
+
 @media (max-width: 768px) {
     .component-row {
         flex-direction: column;
@@ -288,5 +347,13 @@ body {
 
     .service-footer {
         flex-direction: column;
+    }
+
+    [dir="rtl"] .component-row, [dir="rtl"] .service-footer {
+        flex-direction: column;
+    }
+
+    [dir="rtl"] .spec-grid {
+        grid-template-columns: 1fr;
     }
 }

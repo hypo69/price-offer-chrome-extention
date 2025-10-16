@@ -2,13 +2,13 @@
 // \file debug-tabs-checker.js
 // -*- coding: utf-8 -*-
 
-/**
+/
  * Отладочный модуль для диагностики проблемы множественного открытия вкладок
  * ==========================================================================
  * Этот скрипт можно выполнить в консоли background.js для проверки состояния
  */
 
-/**
+/
  * Проверка всех открытых вкладок preview-offer.html
  */
 async function checkPreviewTabs() {
@@ -28,7 +28,7 @@ async function checkPreviewTabs() {
     return tabs;
 }
 
-/**
+/
  * Проверка состояния флагов
  */
 function checkFlags() {
@@ -50,7 +50,7 @@ function checkFlags() {
     }
 }
 
-/**
+/
  * Проверка слушателей событий
  */
 function checkEventListeners() {
@@ -64,7 +64,7 @@ function checkEventListeners() {
     }
 }
 
-/**
+/
  * Закрытие всех дублирующих вкладок preview-offer
  */
 async function closeAllPreviewTabs() {
@@ -85,7 +85,7 @@ async function closeAllPreviewTabs() {
     console.log('Все дублирующие вкладки закрыты');
 }
 
-/**
+/
  * Полная диагностика
  */
 async function fullDiagnostic() {
@@ -117,7 +117,7 @@ async function fullDiagnostic() {
     console.log('╚════════════════════════════════════════════╝\n');
 }
 
-/**
+/
  * Сброс всех флагов принудительно
  */
 function resetAllFlags() {
