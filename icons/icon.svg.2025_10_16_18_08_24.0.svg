@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="1024"
+   height="1024"
+   viewBox="0 0 1024 1024"
+   role="img"
+   aria-label="Minimal input icon with cursor"
+   version="1.1"
+   id="svg3"
+   sodipodi:docname="icon.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs3" />
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1" />
+  <title
+     id="title1">Short it smart — icon (minimal input field with cursor)</title>
+  <!-- Background rounded square -->
+  <rect
+     x="48"
+     y="48"
+     width="928"
+     height="928"
+     rx="160"
+     ry="160"
+     fill="#F5F6F7"
+     id="rect1"
+     style="fill:#f510f7;fill-opacity:1" />
+  <!-- Input field outer rounded rectangle -->
+  <rect
+     x="92"
+     y="412"
+     width="840"
+     height="200"
+     rx="48"
+     ry="48"
+     fill="none"
+     stroke="#172022"
+     stroke-width="36"
+     stroke-linejoin="round"
+     id="rect2"
+     style="display:none" />
+  <!-- Inner short horizontal line (simulates typed text / placeholder) -->
+  <line
+     x1="220"
+     y1="512"
+     x2="700"
+     y2="512"
+     stroke="#172022"
+     stroke-width="36"
+     stroke-linecap="round"
+     id="line2"
+     style="display:none" />
+  <!-- Cursor (vertical bar) -->
+  <line
+     x1="760"
+     y1="478"
+     x2="760"
+     y2="546"
+     stroke="#172022"
+     stroke-width="36"
+     stroke-linecap="round"
+     id="line3"
+     style="display:none" />
+  <!-- Optional subtle shadow under input -->
+  <ellipse
+     cx="512"
+     cy="642"
+     rx="220"
+     ry="12"
+     fill="#000000"
+     opacity="0.02"
+     id="ellipse3" />
+  <text
+     xml:space="preserve"
+     style="font-weight:bold;font-stretch:condensed;font-size:800px;font-family:Arial;-inkscape-font-specification:'Arial Bold Condensed';text-align:center;writing-mode:lr-tb;direction:ltr;text-anchor:middle;opacity:0.783518;fill:#f5fcf7;fill-opacity:1;fill-rule:evenodd;stroke:#2400e0;stroke-width:34.2;stroke-linejoin:round;paint-order:stroke fill markers;stroke-opacity:1;stroke-dasharray:none"
+     x="517.96118"
+     y="743.16168"
+     id="text3"><tspan
+       sodipodi:role="line"
+       id="tspan3"
+       x="517.96118"
+       y="743.16168">Ai</tspan></text>
+</svg>
