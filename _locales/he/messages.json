@@ -1,52 +1,68 @@
 {
   "extensionName": {
-    "message": "הצעת מחיר קזרינוב",
-    "description": "שם התוסף"
+    "message": "מחולל הצעות מחיר קזרינוב",
+    "description": "Название расширения"
   },
   "extensionDescription": {
-    "message": "יוצר תיאורים ברורים ומסודרים של רכיבי מחשב",
-    "description": "תיאור התוסף"
+    "message": "יוצר תיאורים מובנים וברורים של רכיבי מחשב",
+    "description": "Описание расширения"
   },
   "contextMenuTitle": {
     "message": "צור הצעת מחיר",
-    "description": "כותרת פריט בתפריט ההקשרי"
+    "description": "Название пункта контекстного меню"
   },
   "apiKeyLabel": {
     "message": "מפתח API של Google Gemini",
-    "description": "תווית שדה למפתח ה-API"
+    "description": "Подпись для поля ввода API-ключа"
   },
   "modelLabel": {
-    "message": "דגם",
-    "description": "תווית לבחירת הדגם"
+    "message": "מודל",
+    "description": "Подпись для выбора модели"
   },
   "saveButton": {
     "message": "שמור",
-    "description": "טקסט כפתור השמירה"
+    "description": "Текст кнопки сохранения"
   },
   "statusNoApiKey": {
     "message": "אנא הזן את מפתח ה-API שלך",
-    "description": "הודעת מצב כאשר אין מפתח API"
+    "description": "Сообщение, когда API-ключ не введён"
   },
   "indicatorAnalyzing": {
-    "message": "מייצר את הצעת המחיר שלך…",
-    "description": "הודעת מצב במהלך ניתוח התוכן"
+    "message": "הצעת המחיר שלך נוצרת...",
+    "description": "Сообщение во время анализа"
   },
   "errorFetchContent": {
-    "message": "לא ניתן לטעון את תוכן הדף",
-    "description": "שגיאה בעת ניסיון לשלוף את תוכן הדף"
+    "message": "לא ניתן היה לקבל את תוכן העמוד",
+    "description": "Ошибка при получении содержимого страницы"
   },
   "errorPageTooShort": {
-    "message": "תוכן הדף קצר מדי",
-    "description": "שגיאה כאשר תוכן הדף אינו מספיק"
+    "message": "העמוד מכיל מעט מדי תוכן",
+    "description": "Ошибка, когда страница слишком короткая"
   },
   "errorApi": {
     "message": "שגיאת API: $error$",
-    "description": "שגיאה כללית של ה-API",
+    "description": "Общее сообщение об ошибке API",
     "placeholders": {
       "error": {
         "content": "$1",
-        "example": "מפתח API לא חוקי"
+        "example": "מפתח API שגוי"
       }
     }
+  },
+  "price": {
+    "message": "עלות",
+    "description": "Цена сборки"
+  },
+  "totalPriceLabel": {
+    "message": "מחיר סופי:",
+    "description": "Подпись для итоговой цены в предложении"
+  },
+  "saveOfferButton": {
+    "message": "שמור הצעה",
+    "description": "Текст кнопки 'Сохранить предложение'"
+  },
+  "changeImageButton": {
+    "message": "שנה תמונה",
+    "description": "Текст кнопки 'Изменить картинку' в футере"
   }
 }

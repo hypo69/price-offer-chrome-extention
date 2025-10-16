@@ -1,20 +1,22 @@
 // debug.js
 
-/
+/**
  * Модуль просмотра и управления логами расширения
  * ===============================================
  * Интерфейс для просмотра, скачивания и очистки логов
  */
 
-const logger = new Logger('__kazarinov_logs__');
+// logger объявлен в logger.js, здесь просто используем его
+// const logger = new Logger('__kazarinov_logs__'); // Удалено, чтобы избежать конфликта с logger.js
 const logContainer = document.getElementById('logContainer');
 
-/
+/**
  * Отображение логов в контейнере
- * Функция загружает логи из хранилища и форматирует их для отображения
+ * Функция загружает структурированные логи из хранилища и форматирует их для отображения
  */
 async function displayLogs() {
     try {
+        // Используем метод для получения структурированных логов
         const logs = await logger.getLogs();
 
         if (logs.length === 0) {
@@ -41,30 +43,20 @@ async function displayLogs() {
     }
 }
 
-/
+/**
  * Скачивание логов в файл
- * Функция экспортирует все логи в текстовый файл error.log
+ * Функция экспортирует **файл ошибок** (error.log)
  */
 async function downloadLogs() {
     try {
-        const logs = await logger.getLogs();
+        // Используем метод для получения содержимого файла ошибок (только WARN/ERROR)
+        const textToSave = await logger.getErrorFileContent();
 
-        if (logs.length === 0) {
-            alert('Логи пусты, нечего скачивать.');
-            console.warn('[Debug] Попытка скачать пустые логи');
+        if (textToSave.length === 0) {
+            alert('Файл ошибок пуст, нечего скачивать.');
+            console.warn('[Debug] Попытка скачать пустой файл ошибок');
             return;
         }
-
-        const textToSave = logs.map(log => {
-            const timestamp = log.timestamp;
-            const level = log.level.toUpperCase();
-            const message = log.message;
-            const extra = log.extra
-                ? `\n--- DETAILS ---\n${JSON.stringify(log.extra, null, 2)}\n--- END DETAILS ---`
-                : '';
-
-            return `[${timestamp}] [${level}] ${message}${extra}`;
-        }).join('\n========================================\n');
 
         const blob = new Blob([textToSave], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -74,7 +66,7 @@ async function downloadLogs() {
         a.click();
         URL.revokeObjectURL(url);
 
-        console.info('[Debug] Логи успешно скачаны', { logsCount: logs.length });
+        console.info('[Debug] Файл ошибок успешно скачан');
 
     } catch (ex) {
         alert(`Ошибка скачивания логов: ${ex.message}`);
@@ -82,23 +74,23 @@ async function downloadLogs() {
     }
 }
 
-/
+/**
  * Очистка всех логов
- * Функция удаляет все логи из хранилища после подтверждения
+ * Функция удаляет все логи (структурированные и файл ошибок)
  */
 async function clearLogs() {
     try {
-        const confirmed = confirm('Вы уверены, что хотите удалить все логи?');
+        const confirmed = confirm('Вы уверены, что хотите удалить все логи и файл ошибок?');
 
         if (!confirmed) {
             console.info('[Debug] Очистка логов отменена пользователем');
             return;
         }
 
-        await logger.clearLogs();
+        await logger.clearLogs(); // Очистит оба хранилища
         await displayLogs();
 
-        console.info('[Debug] Логи успешно очищены');
+        console.info('[Debug] Логи и файл ошибок успешно очищены');
 
     } catch (ex) {
         alert(`Ошибка очистки логов: ${ex.message}`);
@@ -106,7 +98,7 @@ async function clearLogs() {
     }
 }
 
-/
+/**
  * Инициализация интерфейса просмотра логов
  * Функция привязывает обработчики событий к кнопкам
  */

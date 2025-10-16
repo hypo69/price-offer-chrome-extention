@@ -10,11 +10,10 @@
 
 importScripts('logger.js', 'ui-manager.js', 'gemini.js', 'menu.js', 'handlers.js');
 
-// ▼▼▼ ИЗМЕНЕНИЕ ЗДЕСЬ ▼▼▼
-// Строка `const logger = new Logger(...)` была полностью УДАЛЕНА.
-// Теперь мы используем объект `logger`, который был создан внутри logger.js
+// ▼▼▼ ИСПРАВЛЕНИЕ: УДАЛЕНО ДВОЙНОЕ ОБЪЯВЛЕНИЕ logger
+// const logger = new Logger('__kazarinov_logs__', 100);
 
-const menuManager = new MenuManager(logger); // Эта строка теперь работает правильно
+const menuManager = new MenuManager(logger); // Используем logger, объявленный в logger.js
 
 const MenuClickState = {
     lastClickTime: 0,
@@ -24,33 +23,56 @@ const MenuClickState = {
 
 const DEBOUNCE_TIME = 500;
 
+/**
+ * Отображение результата пользователю
+ * Функция проверяет наличие content script и выбирает способ отображения
+ * 
+ * Args:
+ *     tabId (number): ID вкладки
+ *     summary (string): Текст результата для отображения
+ */
 async function showResultToUser(tabId, summary) {
     logger.debug('Попытка отображения результата пользователю', { tabId: tabId });
 
-    chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        func: () => !!window.__gemini_content_script_loaded
-    }, async (results) => {
-        if (chrome.runtime.lastError) {
-            logger.error('Ошибка проверки content script', {
-                error: chrome.runtime.lastError.message,
-                tabId: tabId
-            });
-            UIManager.showModal(tabId, summary);
-            return;
-        }
+    try {
+        chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            func: () => !!window.__gemini_content_script_loaded
+        }, async (results) => {
+            if (chrome.runtime.lastError) {
+                logger.error('Ошибка проверки content script', {
+                    error: chrome.runtime.lastError.message,
+                    tabId: tabId
+                });
+                UIManager.showModal(tabId, summary);
+                return;
+            }
 
-        if (results?.[0]?.result) {
-            logger.debug('Content script обнаружен, отправка через sendMessage');
-            chrome.tabs.sendMessage(tabId, { action: 'showSummary', summary: summary });
-        } else {
-            logger.debug('Content script не найден, использование fallback модального окна');
-            UIManager.showModal(tabId, summary);
-        }
-    });
+            if (results?.[0]?.result) {
+                logger.debug('Content script обнаружен, отправка через sendMessage');
+                chrome.tabs.sendMessage(tabId, { action: 'showSummary', summary: summary });
+            } else {
+                logger.debug('Content script не найден, использование fallback модального окна');
+                UIManager.showModal(tabId, summary);
+            }
+        });
+    } catch (ex) {
+        logger.error('Ошибка функции showResultToUser', { error: ex.message, stack: ex.stack, tabId: tabId });
+        UIManager.showModal(tabId, summary);
+    }
 }
 
+/**
+ * Сохранение предложения в storage
+ * Функция запрашивает имя у пользователя и сохраняет данные
+ * 
+ * Args:
+ *     tabId (number): ID вкладки
+ *     result (Object): Данные предложения
+ */
 async function saveOffer(tabId, result) {
+    logger.info('Запуск процесса сохранения предложения', { tabId: tabId });
+
     try {
         const injectionResult = await chrome.scripting.executeScript({
             target: { tabId: tabId },
@@ -84,22 +106,59 @@ async function saveOffer(tabId, result) {
     } catch (ex) {
         logger.error('Ошибка сохранения предложения', {
             error: ex.message,
-            stack: ex.stack
+            stack: ex.stack,
+            tabId: tabId
         });
+        UIManager.showError(tabId, 'Ошибка сохранения предложения', 4000, true);
     }
 }
 
+/**
+ * Проверка доступности вкладки для работы расширения
+ * Функция проверяет URL вкладки на наличие ограниченных протоколов
+ * 
+ * Args:
+ *     tab (Object): Объект вкладки Chrome
+ * 
+ * Returns:
+ *     boolean: true если вкладка доступна, false иначе
+ */
 function isTabAccessible(tab) {
-    if (!tab || !tab.url) return false;
+    if (!tab || !tab.url) {
+        logger.debug('Вкладка недоступна: отсутствует объект или URL');
+        return false;
+    }
+
     const restrictedProtocols = ['chrome://', 'edge://', 'about:', 'file://'];
-    return !restrictedProtocols.some(protocol => tab.url.startsWith(protocol));
+    const isRestricted = restrictedProtocols.some(protocol => tab.url.startsWith(protocol));
+
+    if (isRestricted) {
+        logger.debug('Вкладка недоступна: ограниченный протокол', { url: tab.url });
+    }
+
+    return !isRestricted;
 }
 
+/**
+ * Обработчик установки/обновления расширения
+ */
 chrome.runtime.onInstalled.addListener(async () => {
     logger.info('Расширение установлено/обновлено');
-    await menuManager.initialize();
+
+    try {
+        await menuManager.initialize();
+        logger.info('Инициализация контекстного меню завершена');
+    } catch (ex) {
+        logger.error('Ошибка инициализации при установке расширения', {
+            error: ex.message,
+            stack: ex.stack
+        });
+    }
 });
 
+/**
+ * Обработчик кликов по контекстному меню
+ */
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const now = Date.now();
     const timeSinceLastClick = now - MenuClickState.lastClickTime;
@@ -158,18 +217,28 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             return;
         }
 
+        if (menuItemId === MENU_CONFIG.GENERATE_OFFER_FROM_COMPONENTS_ID) {
+            await handleGenerateOfferWithUI(tab);
+            return;
+        }
+
+        // ▼▼▼ ИСПРАВЛЕННАЯ ЛОГИКА ДЛЯ МЕНЮ ЯЗЫКА (после предыдущих итераций) ▼▼▼
         if (menuItemId.startsWith('generate-offer-lang-')) {
             const lang = menuItemId.split('-').pop();
             await handleGenerateOffer(tab, lang === 'default' ? null : lang);
             return;
         }
 
+        logger.warn('Неизвестный пункт меню', { menuItemId });
+
     } catch (ex) {
         logger.error('Ошибка обработки клика по меню', {
             error: ex.message,
             stack: ex.stack,
-            menuItemId: info.menuItemId
+            menuItemId: info.menuItemId,
+            tabId: tab?.id
         });
+        UIManager.showError(tab.id, 'Ошибка обработки действия', 4000, true);
     } finally {
         setTimeout(() => {
             MenuClickState.processing = false;
@@ -178,10 +247,119 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
 });
 
+/**
+ * Обработчик генерации предложения с UI индикаторами
+ * Функция выполняет пошаговую генерацию с отображением статуса
+ * 
+ * Args:
+ *     tab (Object): Объект вкладки Chrome
+ */
+async function handleGenerateOfferWithUI(tab) {
+    logger.info('Запуск генерации предложения с UI', { tabId: tab.id });
+
+    try {
+        UIManager.showIndicator(tab.id, 'Собираем компоненты...');
+        const components = await getComponentsForOffer();
+
+        if (!components || components.length === 0) {
+            logger.warn('Нет компонентов для генерации предложения', { tabId: tab.id });
+            UIManager.showError(tab.id, 'Нет компонентов для генерации предложения', 4000, true);
+            return;
+        }
+
+        logger.debug('Компоненты получены', { count: components.length, tabId: tab.id });
+
+        UIManager.showIndicator(tab.id, 'Формируем текст запроса...');
+        const pageText = components.map(c => c.text).join('\n');
+        const apiKey = await getGeminiApiKey();
+        const model = await getGeminiModel();
+
+        logger.debug('Параметры для Gemini получены', { model, textLength: pageText.length });
+
+        UIManager.showIndicator(tab.id, 'Отправка запроса в Gemini...');
+        const resultText = await GeminiAPI.getFullPriceOffer(pageText, apiKey, model);
+
+        logger.debug('Ответ от Gemini получен', { responseLength: resultText.length });
+
+        UIManager.showIndicator(tab.id, 'Парсим ответ модели...');
+        const resultJSON = await GeminiAPI.getModelResponseJSON(pageText, apiKey, model);
+
+        UIManager.hideIndicator(tab.id);
+        UIManager.showModal(tab.id, JSON.stringify(resultJSON, null, 2));
+        UIManager.showNotification(tab.id, 'Предложение успешно сгенерировано');
+
+        logger.info('Генерация предложения завершена успешно', { tabId: tab.id });
+
+    } catch (ex) {
+        logger.error('Ошибка генерации предложения', {
+            error: ex.message,
+            stack: ex.stack,
+            tabId: tab.id
+        });
+        UIManager.hideIndicator(tab.id);
+        UIManager.showError(tab.id, 'Ошибка при генерации предложения', 4000, true);
+    }
+}
 
 /**
- * Отладочные функции для диагностики
+ * Получение компонентов для формирования предложения
+ * Функция загружает компоненты из storage
+ * 
+ * Returns:
+ *     Promise<Array>: Массив компонентов
  */
+async function getComponentsForOffer() {
+    try {
+        const { [MenuManager.STORAGE_KEY]: components = [] } = await chrome.storage.local.get(MenuManager.STORAGE_KEY);
+        logger.debug('Компоненты загружены из storage', { count: components.length });
+        return components;
+    } catch (ex) {
+        logger.error('Ошибка загрузки компонентов', { error: ex.message, stack: ex.stack });
+        return [];
+    }
+}
+
+/**
+ * Получение API ключа Gemini
+ * 
+ * Returns:
+ *     Promise<string>: API ключ
+ */
+async function getGeminiApiKey() {
+    try {
+        const { geminiApiKey } = await chrome.storage.sync.get('geminiApiKey');
+        if (!geminiApiKey) {
+            logger.warn('API ключ отсутствует в storage');
+            throw new Error('API ключ не установлен');
+        }
+        return geminiApiKey;
+    } catch (ex) {
+        logger.error('Ошибка получения API ключа', { error: ex.message, stack: ex.stack });
+        throw ex;
+    }
+}
+
+/**
+ * Получение модели Gemini
+ * 
+ * Returns:
+ *     Promise<string>: Название модели
+ */
+async function getGeminiModel() {
+    try {
+        const { geminiModel = 'gemini-2.5-flash' } = await chrome.storage.sync.get('geminiModel');
+        logger.debug('Модель Gemini получена', { model: geminiModel });
+        return geminiModel;
+    } catch (ex) {
+        logger.error('Ошибка получения модели', { error: ex.message, stack: ex.stack });
+        return 'gemini-2.5-flash';
+    }
+}
+
+// ============================================================================
+// ОТЛАДОЧНЫЕ ФУНКЦИИ
+// ============================================================================
+
 self.checkPreviewTabs = async function () {
     const previewUrl = chrome.runtime.getURL('preview-offer.html');
     const tabs = await chrome.tabs.query({ url: previewUrl });
@@ -219,21 +397,25 @@ self.checkState = function () {
 };
 
 self.closeAllPreviewTabs = async function () {
-    const tabs = await self.checkPreviewTabs();
+    try {
+        const tabs = await self.checkPreviewTabs();
 
-    if (tabs.length <= 1) {
-        logger.debug('Дублирующих вкладок не найдено');
-        return;
+        if (tabs.length <= 1) {
+            logger.debug('Дублирующих вкладок не найдено');
+            return;
+        }
+
+        logger.debug(`Закрытие ${tabs.length - 1} дублирующих вкладок...`);
+
+        for (let i = 1; i < tabs.length; i++) {
+            await chrome.tabs.remove(tabs[i].id);
+            logger.debug(`Закрыта вкладка ${tabs[i].id}`);
+        }
+
+        logger.info('Все дублирующие вкладки закрыты');
+    } catch (ex) {
+        logger.error('Ошибка закрытия вкладок', { error: ex.message, stack: ex.stack });
     }
-
-    logger.debug(`Закрытие ${tabs.length - 1} дублирующих вкладок...`);
-
-    for (let i = 1; i < tabs.length; i++) {
-        await chrome.tabs.remove(tabs[i].id);
-        logger.debug(`Закрыта вкладка ${tabs[i].id}`);
-    }
-
-    logger.debug('Все дублирующие вкладки закрыты');
 };
 
 self.fullDiagnostic = async function () {
@@ -241,27 +423,31 @@ self.fullDiagnostic = async function () {
     logger.debug('║   ПОЛНАЯ ДИАГНОСТИКА РАСШИРЕНИЯ           ║');
     logger.debug('╚════════════════════════════════════════════╝\n');
 
-    await self.checkPreviewTabs();
-    logger.debug('');
-    self.checkState();
-    logger.debug('');
+    try {
+        await self.checkPreviewTabs();
+        logger.debug('');
+        self.checkState();
+        logger.debug('');
 
-    const storage = await chrome.storage.local.get([
-        'addedComponents',
-        'componentsForOffer',
-        'previewOfferTabId',
-        'previewOfferData'
-    ]);
+        const storage = await chrome.storage.local.get([
+            'addedComponents',
+            'componentsForOffer',
+            'previewOfferTabId',
+            'previewOfferData'
+        ]);
 
-    logger.debug('=== ПРОВЕРКА STORAGE ===');
-    logger.debug('addedComponents:', storage.addedComponents?.length || 0);
-    logger.debug('componentsForOffer:', storage.componentsForOffer?.length || 0);
-    logger.debug('previewOfferTabId:', storage.previewOfferTabId);
-    logger.debug('previewOfferData:', storage.previewOfferData ? 'присутствует' : 'отсутствует');
+        logger.debug('=== ПРОВЕРКА STORAGE ===');
+        logger.debug('addedComponents:', storage.addedComponents?.length || 0);
+        logger.debug('componentsForOffer:', storage.componentsForOffer?.length || 0);
+        logger.debug('previewOfferTabId:', storage.previewOfferTabId);
+        logger.debug('previewOfferData:', storage.previewOfferData ? 'присутствует' : 'отсутствует');
 
-    logger.debug('\n╔════════════════════════════════════════════╗');
-    logger.debug('║   ДИАГНОСТИКА ЗАВЕРШЕНА                   ║');
-    logger.debug('╚════════════════════════════════════════════╝\n');
+        logger.debug('\n╔════════════════════════════════════════════╗');
+        logger.debug('║   ДИАГНОСТИКА ЗАВЕРШЕНА                   ║');
+        logger.debug('╚════════════════════════════════════════════╝\n');
+    } catch (ex) {
+        logger.error('Ошибка выполнения диагностики', { error: ex.message, stack: ex.stack });
+    }
 };
 
 self.resetAllFlags = function () {
@@ -280,7 +466,7 @@ self.resetAllFlags = function () {
         logger.debug('⚠ previewTabMutex не определен');
     }
 
-    logger.debug('Все флаги сброшены');
+    logger.info('Все флаги сброшены');
 };
 
 setTimeout(() => {

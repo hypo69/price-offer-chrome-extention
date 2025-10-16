@@ -1,8 +1,8 @@
 // execute-locators.js
 
-/
- * Вспомогательные функции для извлечения данных по локаторам
- */
+/**
+    * Вспомогательные функции для извлечения данных по локаторам
+*/
 
 function getElementValue(locator) {
     const { by, selector, attribute, if_list, mandatory, locator_description } = locator;

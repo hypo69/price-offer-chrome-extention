@@ -48,5 +48,21 @@
         "example": "Неверный API-ключ"
       }
     }
+  },
+  "price": {
+    "message": "Цена",
+    "description": "Цена сборки"
+  },
+  "totalPriceLabel": {
+    "message": "Итоговая цена:",
+    "description": "Подпись для итоговой цены в предложении"
+  },
+  "saveOfferButton": {
+    "message": "Сохранить предложение",
+    "description": "Текст кнопки 'Сохранить предложение'"
+  },
+  "changeImageButton": {
+    "message": "Изменить картинку",
+    "description": "Текст кнопки 'Изменить картинку' в футере"
   }
 }
